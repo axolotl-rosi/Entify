@@ -2930,10 +2930,7 @@ class MainActivity : ComponentActivity() {
                                                     })();
                                                 """.trimIndent(), null)
                                                 
-                                                if (!startupToastShown) {
-                                                    Toast.makeText(this@MainActivity, "로그인 완료", Toast.LENGTH_SHORT).show()
-                                                    startupToastShown = true
-                                                }
+                                                startupToastShown = true
                                                 // 메인으로 즉시 이동 → onPageFinished에서 3초 후 jsFetchCommentNotifications 호출
                                                 try {
                                                     val wv = mainWebView
@@ -6062,22 +6059,18 @@ class MainActivity : ComponentActivity() {
         checkBatteryOptimizationNotice()
     }
 
-    private var hasPromptedBatteryOptimization = false
-
     private fun checkBatteryOptimizationNotice() {
-        if (hasPromptedBatteryOptimization) return
-        if (preferenceManager.isLoggedIn && !preferenceManager.logoutPending) {
-            if (!com.example.entify_again.util.BatteryOptimizationHelper.isBatteryOptimizationIgnored(this)) {
-                hasPromptedBatteryOptimization = true
-                androidx.appcompat.app.AlertDialog.Builder(this)
-                    .setTitle("실시간 알림 안정성 설정")
-                    .setMessage("휴대폰 화면이 꺼진 상태에서도 엔트리 알림이 지연 없이 도착하려면 '배터리 사용량 제한 없음' 설정이 필요합니다.\n\n지금 설정하시겠습니까?")
-                    .setPositiveButton("설정하기") { _, _ ->
-                        com.example.entify_again.util.BatteryOptimizationHelper.requestIgnoreBatteryOptimization(this)
-                    }
-                    .setNegativeButton("나중에", null)
-                    .show()
-            }
+        if (preferenceManager.hasPromptedBatteryOptimization) return
+        if (!com.example.entify_again.util.BatteryOptimizationHelper.isBatteryOptimizationIgnored(this)) {
+            preferenceManager.hasPromptedBatteryOptimization = true
+            androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("배터리 최적화 설정 안내")
+                .setMessage("휴대폰 화면이 꺼진 상태에서도 10초 주기로 엔트리 알림을 정상 감지하려면 배터리 사용량 제한을 '제한 없음'으로 설정하는 것이 권장됩니다. 지금 설정하시겠습니까?\n\n(강제 사항이 아니며 나중에 설정 메뉴에서도 변경하실 수 있습니다.)")
+                .setPositiveButton("설정하기") { _, _ ->
+                    com.example.entify_again.util.BatteryOptimizationHelper.requestIgnoreBatteryOptimization(this)
+                }
+                .setNegativeButton("나중에", null)
+                .show()
         }
     }
 
@@ -13285,7 +13278,6 @@ class MainActivity : ComponentActivity() {
                                 AndroidLog.d("LOGIN_OK", "Skip main poller injection - alarm poller preferred")
                             }
                             mainWebView?.evaluateJavascript(jsTokenPoller, null)
-                            Toast.makeText(this@MainActivity, "로그인 완료 - 알림 감지 시작", Toast.LENGTH_SHORT).show()
                         } catch (e: Exception) {
                             AndroidLog.e("LOGIN_OK", "Failed to inject poller: ${e.message}")
                         }

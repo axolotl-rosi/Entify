@@ -23,6 +23,7 @@ enum class FeedFilter(val label: String) {
     FOLLOW("팔로우"),
     REMAKE("리메이크"),
     SHARE("공유"),
+    SYSTEM("시스템"),
     STARRED("즐겨찾기"),
     BLOCKED("차단된 알림")
 }
@@ -47,6 +48,7 @@ class FeedViewModel(
                 FeedFilter.ALL -> repository.getAllNotifications()
                 FeedFilter.STARRED -> repository.getStarred()
                 FeedFilter.BLOCKED -> repository.getBlocked()
+                FeedFilter.SYSTEM -> repository.getSystemNotifications()
                 else -> repository.getByCategory(filter.name)
             }.map { notifications ->
                 FeedUiState(

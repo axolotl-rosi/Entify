@@ -17,6 +17,8 @@ class NotificationRepository(context: Context) {
 
     fun getByCategory(category: String): Flow<List<NotificationEntity>> = dao.getByCategory(category)
 
+    fun getSystemNotifications(): Flow<List<NotificationEntity>> = dao.getSystemNotifications()
+
     fun getStarred(): Flow<List<NotificationEntity>> = dao.getStarred()
  
     fun getBlocked(): Flow<List<NotificationEntity>> = dao.getBlocked()

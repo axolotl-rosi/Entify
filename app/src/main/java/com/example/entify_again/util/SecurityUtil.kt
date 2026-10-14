@@ -190,6 +190,33 @@ object SecurityUtil {
     }
 
     /**
+     * 엔트리 프로필 마이페이지 URL 또는 텍스트에서 24자리 Hex ID를 추출합니다.
+     * 예: https://playentry.org/profile/61409f26389b55ababc8d4f4/project?sort=created... -> 61409f26389b55ababc8d4f4
+     * URL이 잘리거나 뒤에 쿼리가 붙어도 24자리 hexID를 정확하게 찾아내며,
+     * 24자리 hexID가 없을 경우 마이페이지 유저네임 또는 앞뒤 공백을 제거한 원본을 반환합니다.
+     */
+    fun extractProfileHexId(input: String?): String {
+        if (input.isNullOrBlank()) return ""
+        val trimmed = input.trim()
+        // 1) profile/ 뒤의 24자리 hex 추출 우선
+        val profileRegex = Regex("""profile/([0-9a-fA-F]{24})""", RegexOption.IGNORE_CASE)
+        profileRegex.find(trimmed)?.let {
+            return it.groupValues[1].lowercase(Locale.ROOT)
+        }
+        // 2) 문자열 내에 존재하는 24자리 hex 추출
+        val hexRegex = Regex("""\b([0-9a-fA-F]{24})\b""")
+        hexRegex.find(trimmed)?.let {
+            return it.groupValues[1].lowercase(Locale.ROOT)
+        }
+        // 3) 만약 profile/ 뒤의 닉네임 형식인 경우 (e.g. profile/username)
+        val profileUserRegex = Regex("""profile/([^/?#]+)""", RegexOption.IGNORE_CASE)
+        profileUserRegex.find(trimmed)?.let {
+            return it.groupValues[1]
+        }
+        return trimmed
+    }
+
+    /**
      * 토큰이나 쿠키 문자열을 로그에 남길 때 민감정보를 마스킹합니다.
      */
     fun maskToken(token: String?): String {

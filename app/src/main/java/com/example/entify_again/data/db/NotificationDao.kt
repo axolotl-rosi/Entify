@@ -17,6 +17,9 @@ interface NotificationDao {
     @Query("SELECT * FROM notifications WHERE category = :category AND isBlocked = 0 ORDER BY createdAt DESC")
     fun getByCategory(category: String): Flow<List<NotificationEntity>>
 
+    @Query("SELECT * FROM notifications WHERE (category = 'SYSTEM' OR category = 'WARNING' OR category = 'NOTICE') AND isBlocked = 0 ORDER BY createdAt DESC")
+    fun getSystemNotifications(): Flow<List<NotificationEntity>>
+
     @Query("SELECT * FROM notifications WHERE isStarred = 1 AND isBlocked = 0 ORDER BY createdAt DESC")
     fun getStarred(): Flow<List<NotificationEntity>>
 

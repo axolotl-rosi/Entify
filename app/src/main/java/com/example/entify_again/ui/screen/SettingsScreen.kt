@@ -242,11 +242,11 @@ fun SettingsScreen(
         val isBatteryIgnored = BatteryOptimizationHelper.isBatteryOptimizationIgnored(context)
         SettingsItem(
             icon = Icons.Default.BatteryChargingFull,
-            title = "배터리 사용량 제한 없음",
+            title = "배터리 사용량 제한",
             subtitle = if (isBatteryIgnored) {
-                "✅ 제한 없음 설정됨 (화면 꺼짐 시에도 실시간 알림 수신)"
+                "설정 상태: 제한 없음 (화면 꺼짐 시에도 정상 수신)"
             } else {
-                "⚠️ 절전 모드로 알림이 지연될 수 있음 (탭하여 제한 없음으로 변경)"
+                "설정 상태: 제한됨 (절전 모드로 인해 알림이 지연될 수 있음 · 탭하여 해제)"
             },
             onClick = {
                 BatteryOptimizationHelper.requestIgnoreBatteryOptimization(context)
@@ -440,15 +440,15 @@ fun SettingsScreen(
         )
     }
 
-    // Edit Hex ID dialog
+    // Edit Profile / Hex ID dialog
     if (showEditHexIdDialog) {
         AlertDialog(
             onDismissRequest = { showEditHexIdDialog = false },
-            title = { Text("내 Hex ID 재설정 / 수정") },
+            title = { Text("내 프로필 / Hex ID 설정") },
             text = {
                 Column {
                     Text(
-                        text = "댓글 작성자 식별 및 좋아요 매칭에 사용되는 24자리 Hex ID(MongoDB ObjectId)입니다. 자동 인식이 잘못되었거나 다른 계정의 ID를 사용해야 할 때 직접 수정할 수 있습니다.",
+                        text = "마이페이지 주소 또는 24자리 Hex ID를 입력해주세요. 엔트리 마이페이지 주소를 붙여넣으면 ID만 자동으로 추출됩니다.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -456,8 +456,8 @@ fun SettingsScreen(
                     OutlinedTextField(
                         value = tempHexId,
                         onValueChange = { tempHexId = it.trim() },
-                        label = { Text("Hex ID (24자리)") },
-                        placeholder = { Text("예: 61409f26389b55ababc8d4f4") },
+                        label = { Text("마이페이지 주소 또는 Hex ID") },
+                        placeholder = { Text("예: https://playentry.org/profile/61409f... 또는 24자리 ID") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -465,7 +465,8 @@ fun SettingsScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    viewModel.setCommentUserId(tempHexId)
+                    val extracted = com.example.entify_again.util.SecurityUtil.extractProfileHexId(tempHexId)
+                    viewModel.setCommentUserId(extracted)
                     showEditHexIdDialog = false
                 }) { Text("저장") }
             },
@@ -983,7 +984,7 @@ private fun NotificationShapePreview() {
                 body = "엔트리봇님이 내 댓글에 답글을 작성했어요\n\"좋은 피드백 감사드려요! 곧 반영해보겠습니다.\"",
                 deepLink = "https://playentry.org/project/sample",
                 isRead = false,
-                isStarred = true,
+                isStarred = false,
                 createdAt = System.currentTimeMillis() - 600000
             )),
             Triple("좋아요", "template_3", NotificationEntity(

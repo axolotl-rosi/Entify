@@ -262,6 +262,84 @@
       gap: 8px;
     }
 
+    /* Setup Quick Guide */
+    .setup-quickguide {
+      margin-top: 14px;
+      width: 100%;
+      background: var(--surface-1);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 16px;
+      text-align: left;
+      transition: all 0.25s var(--ease-out);
+    }
+
+    .setup-quickguide:hover {
+      border-color: var(--border-strong);
+      background: var(--surface-2);
+    }
+
+    .setup-guide-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .setup-steps-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .setup-steps-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .step-badge {
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: var(--mono);
+      color: var(--text-sub);
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .step-text {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .step-text strong {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .step-text span {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+
     /* Technical Specification Strip */
     .specs-strip {
       display: grid;
@@ -611,6 +689,40 @@
           <span>패키지 크기: 14.5 MB</span>
           <span>•</span>
           <span>SHA-256 서명 빌드</span>
+        </div>
+
+        <!-- Setup Quick Guide Under Download Button -->
+        <div class="setup-quickguide">
+          <div class="setup-guide-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span>설치 및 단말기 세팅 순서</span>
+          </div>
+          <ol class="setup-steps-list">
+            <li>
+              <span class="step-badge">1</span>
+              <div class="step-text"><strong>설치 버튼 클릭</strong><span>상단 버튼을 눌러 최신 APK 패키지 다운로드</span></div>
+            </li>
+            <li>
+              <span class="step-badge">2</span>
+              <div class="step-text"><strong>자동보안 잠시 허용</strong><span>단말기 안내 시 '출처를 알 수 없는 앱 설치' 권한 허용</span></div>
+            </li>
+            <li>
+              <span class="step-badge">3</span>
+              <div class="step-text"><strong>무시하고 설치 선택</strong><span>Play 프로텍트 안내 창에서 '세부정보 보기 &gt; 무시하고 설치'</span></div>
+            </li>
+            <li>
+              <span class="step-badge">4</span>
+              <div class="step-text"><strong>Google Play 프로텍트 점검 (선택)</strong><span>설치 후 Play 프로텍트로 앱 무결성 확인 가능</span></div>
+            </li>
+            <li>
+              <span class="step-badge">5</span>
+              <div class="step-text"><strong>완료하기</strong><span>앱 실행 후 엔트리 계정 1회 로그인으로 백그라운드 감시 활성화</span></div>
+            </li>
+          </ol>
         </div>
       </div>
     </section>

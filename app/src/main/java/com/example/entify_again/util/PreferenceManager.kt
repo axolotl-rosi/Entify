@@ -41,6 +41,7 @@ class PreferenceManager(context: Context) {
         private const val KEY_DND_START_MINUTE = "dnd_start_minute"
         private const val KEY_DND_END_HOUR = "dnd_end_hour"
         private const val KEY_DND_END_MINUTE = "dnd_end_minute"
+        private const val KEY_HAS_PROMPTED_BATTERY_OPTIMIZATION = "has_prompted_battery_optimization"
 
         // Reactive theme mode flow
         private val _themeModeFlow = MutableStateFlow("SYSTEM")
@@ -351,6 +352,10 @@ class PreferenceManager(context: Context) {
     var isDndEnabled: Boolean
         get() = prefs.getBoolean(KEY_DND_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_DND_ENABLED, value).apply()
+
+    var hasPromptedBatteryOptimization: Boolean
+        get() = prefs.getBoolean(KEY_HAS_PROMPTED_BATTERY_OPTIMIZATION, false)
+        set(value) = prefs.edit().putBoolean(KEY_HAS_PROMPTED_BATTERY_OPTIMIZATION, value).apply()
 
     var dndStartHour: Int
         get() = prefs.getInt(KEY_DND_START_HOUR, 23)

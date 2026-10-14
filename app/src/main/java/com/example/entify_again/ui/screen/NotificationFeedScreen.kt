@@ -66,6 +66,7 @@ fun NotificationFeedScreen(
     var isSelectionMode by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
     var showDeleteSelectionDialog by remember { mutableStateOf(false) }
+    var pendingDeleteDateGroup by remember { mutableStateOf<Pair<String, Set<Long>>?>(null) }
 
     var currentPage by remember { mutableStateOf(1) }
     val pageSize = 25
@@ -227,6 +228,9 @@ fun NotificationFeedScreen(
                                     } else {
                                         selectedIds + dateItemIds
                                     }
+                                },
+                                onDeleteDateGroup = {
+                                    pendingDeleteDateGroup = dateLabel to dateItemIds
                                 }
                             )
                         }
@@ -385,6 +389,30 @@ fun NotificationFeedScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteSelectionDialog = false }) {
+                    Text("취소")
+                }
+            }
+        )
+    }
+
+    // 5. 일별 묶음 삭제 확인 다이얼로그
+    pendingDeleteDateGroup?.let { (dateLabel, dateIds) ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteDateGroup = null },
+            title = { Text("$dateLabel 알림 일괄 삭제") },
+            text = { Text("'$dateLabel' 알림 ${dateIds.size}개를 모두 삭제하시겠습니까?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    val targets = dateIds
+                    pendingDeleteDateGroup = null
+                    selectedIds = selectedIds - targets
+                    viewModel.deleteNotifications(targets)
+                }) {
+                    Text("삭제", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteDateGroup = null }) {
                     Text("취소")
                 }
             }

@@ -62,6 +62,25 @@ class FilterViewModel(
         }
     }
 
+    fun isSelfUser(input: String): Boolean {
+        val selfHex = prefs.commentUserId?.trim().orEmpty()
+        val selfNick = prefs.username?.trim().orEmpty()
+        val clean = input.trim()
+        val extracted = com.example.entify_again.util.SecurityUtil.extractProfileHexId(clean)
+
+        if (selfHex.isNotBlank()) {
+            if (clean.equals(selfHex, ignoreCase = true) || extracted.equals(selfHex, ignoreCase = true)) {
+                return true
+            }
+        }
+        if (selfNick.isNotBlank()) {
+            if (clean.equals(selfNick, ignoreCase = true) || extracted.equals(selfNick, ignoreCase = true)) {
+                return true
+            }
+        }
+        return false
+    }
+
     fun blockUser(hexId: String, nickname: String) {
         viewModelScope.launch {
             val cleanHex = hexId.trim()

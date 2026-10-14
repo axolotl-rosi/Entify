@@ -120,7 +120,9 @@ fun NotificationCard(
             fallbackBody = notification.body
         )
     }
-    val hasLongBody = (commentContent?.length ?: notification.body.length) > 70 || notification.body.contains('\n')
+    var isContentTruncated by remember(notification.id, notification.body, commentContent) { mutableStateOf(false) }
+    val rawContent = commentContent ?: notification.body
+    val hasLongBody = isContentTruncated || rawContent.length > 120 || rawContent.lines().size > 3
     val canNavigate = remember(notification.deepLink) {
         SecurityUtil.isValidEntryUrl(notification.deepLink) && !isNonInteractiveDeepLink(notification.deepLink)
     }
@@ -331,7 +333,12 @@ fun NotificationCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = if (commentContent != null) 2 else (if (expanded) Int.MAX_VALUE else 2),
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        onTextLayout = { textLayoutResult ->
+                            if (!expanded && commentContent == null && (textLayoutResult.hasVisualOverflow || textLayoutResult.lineCount > 2)) {
+                                isContentTruncated = true
+                            }
+                        }
                     )
 
                     // Actual Comment in SNS-style Quote Bubble (Bold & Distinct Color)
@@ -362,7 +369,12 @@ fun NotificationCard(
                                         color = MaterialTheme.colorScheme.onSurface
                                     ),
                                     maxLines = if (expanded) Int.MAX_VALUE else 3,
-                                    overflow = if (expanded) TextOverflow.Clip else TextOverflow.Ellipsis
+                                    overflow = if (expanded) TextOverflow.Clip else TextOverflow.Ellipsis,
+                                    onTextLayout = { textLayoutResult ->
+                                        if (!expanded && (textLayoutResult.hasVisualOverflow || textLayoutResult.lineCount > 3)) {
+                                            isContentTruncated = true
+                                        }
+                                    }
                                 )
                             }
                         }

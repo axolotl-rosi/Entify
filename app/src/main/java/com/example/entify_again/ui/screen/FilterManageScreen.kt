@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
 import androidx.compose.material3.FilterChip
@@ -41,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.entify_again.ui.component.CategorySettingItem
 import com.example.entify_again.ui.viewmodel.FilterViewModel
+import com.example.entify_again.util.SecurityUtil
 
 @Composable
 fun FilterManageScreen(
@@ -48,6 +50,7 @@ fun FilterManageScreen(
     viewModel: FilterViewModel = viewModel(factory = FilterViewModel.Factory(context))
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var showSelfBlockEasterEgg by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -91,36 +94,53 @@ fun FilterManageScreen(
 
         // Add user block input row
         var inputHexOrNick by remember { mutableStateOf("") }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OutlinedTextField(
-                value = inputHexOrNick,
-                onValueChange = { inputHexOrNick = it },
-                label = { Text("닉네임 또는 유저 Hex ID") },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-                textStyle = MaterialTheme.typography.bodyMedium
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Button(
-                onClick = {
-                    val trimmed = inputHexOrNick.trim()
-                    if (trimmed.isNotBlank()) {
-                        val isHex = Regex("^[0-9a-fA-F]{24}$").matches(trimmed)
-                        val hex = if (isHex) trimmed else ""
-                        val nick = if (isHex) trimmed.take(8) else trimmed
-                        viewModel.blockUser(hex, nick)
-                        inputHexOrNick = ""
-                    }
-                },
-                enabled = inputHexOrNick.isNotBlank()
+
+        Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("차단")
+                OutlinedTextField(
+                    value = inputHexOrNick,
+                    onValueChange = { inputHexOrNick = it },
+                    label = { Text("유저 마이페이지 주소") },
+                    placeholder = { Text("https://playentry.org/profile/...") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                    textStyle = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(
+                    onClick = {
+                        val trimmed = inputHexOrNick.trim()
+                        if (trimmed.isNotBlank()) {
+                            if (viewModel.isSelfUser(trimmed)) {
+                                showSelfBlockEasterEgg = true
+                            } else {
+                                val extractedHex = SecurityUtil.extractProfileHexId(trimmed)
+                                val isHex = Regex("^[0-9a-fA-F]{24}$").matches(extractedHex)
+                                val hex = if (isHex) extractedHex else (if (Regex("^[0-9a-fA-F]{24}$").matches(trimmed)) trimmed else "")
+                                val nick = when {
+                                    isHex -> extractedHex.take(8)
+                                    extractedHex.isNotBlank() && extractedHex != trimmed -> extractedHex
+                                    else -> trimmed
+                                }
+                                viewModel.blockUser(hex, nick)
+                                inputHexOrNick = ""
+                            }
+                        }
+                    },
+                    enabled = inputHexOrNick.isNotBlank()
+                ) {
+                    Text("차단")
+                }
             }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "차단할 유저의 마이페이지 주소 또는 24자리 Hex ID를 입력해주세요.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -246,5 +266,18 @@ fun FilterManageScreen(
         )
 
         Spacer(modifier = Modifier.height(32.dp))
+    }
+
+    if (showSelfBlockEasterEgg) {
+        AlertDialog(
+            onDismissRequest = { showSelfBlockEasterEgg = false },
+            title = { Text("차단 불가") },
+            text = { Text("본인까지 차단하시면 제가 누구 알림을 가져오나요ㅠㅠ") },
+            confirmButton = {
+                TextButton(onClick = { showSelfBlockEasterEgg = false }) {
+                    Text("확인")
+                }
+            }
+        )
     }
 }

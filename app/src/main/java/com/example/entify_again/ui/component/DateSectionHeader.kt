@@ -21,7 +21,8 @@ fun DateSectionHeader(
     modifier: Modifier = Modifier,
     isSelectionMode: Boolean = false,
     allDateSelected: Boolean = false,
-    onToggleDateSelect: (() -> Unit)? = null
+    onToggleDateSelect: (() -> Unit)? = null,
+    onDeleteDateGroup: (() -> Unit)? = null
 ) {
     Row(
         modifier = modifier
@@ -36,17 +37,32 @@ fun DateSectionHeader(
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        if (isSelectionMode && onToggleDateSelect != null) {
-            TextButton(
-                onClick = onToggleDateSelect,
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-            ) {
-                Text(
-                    text = if (allDateSelected) "$label 선택 해제" else "$label 전체 선택",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary
-                )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (isSelectionMode && onToggleDateSelect != null) {
+                TextButton(
+                    onClick = onToggleDateSelect,
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = if (allDateSelected) "$label 선택 해제" else "$label 전체 선택",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            if (onDeleteDateGroup != null) {
+                TextButton(
+                    onClick = onDeleteDateGroup,
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "$label 삭제",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.85f)
+                    )
+                }
             }
         }
     }
