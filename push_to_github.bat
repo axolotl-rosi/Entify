@@ -24,11 +24,12 @@ if %ERRORLEVEL% EQU 0 (
     )
     git add .
     git commit -m "feat: Entify notification client with DND, swipe-dismiss, per-user filter, and web installer"
-    gh repo create Entify --public --source=. --remote=origin --push
+    gh repo create Entiy --public --source=. --remote=origin --push
     if %ERRORLEVEL% EQU 0 (
         echo.
         echo ========================================================
-        echo  🎉 성공! GitHub에 Entify 저장소가 성공적으로 등록되었습니다!
+        echo  성공! GitHub에 Entiy 저장소가 성공적으로 등록되었습니다!
+        echo  주소: https://github.com/axolotl-rosi/Entiy
         echo ========================================================
         echo.
         pause
