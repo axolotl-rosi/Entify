@@ -1,0 +1,29 @@
+*.iml
+.gradle
+/local.properties
+local.properties
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+
+# IDE & Editor caches
+.idea/
+.serena/
+.claude/
+*.backup
+
+
+# Sensitive & Debug Data (CRITICAL: Do not commit tokens or dumps)
+prefs*.xml
+test_token.py
+logcat.txt
+memo.txt
+*.jks
+*.keystore
+
+# Android build outputs except web installer APK
+app/build/
+*.hprof
+

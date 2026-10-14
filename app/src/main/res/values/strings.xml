@@ -1,0 +1,35 @@
+<resources>
+    <string name="app_name">Entify</string>
+    <string name="accessibility_service_description">엔트리 알림을 감지하고 자동으로 답글을 작성합니다.</string>
+    
+    <!-- MainActivity -->
+    <string name="title_login">엔트리 로그인</string>
+    <string name="hint_username">아이디</string>
+    <string name="hint_password">비밀번호</string>
+    <string name="btn_login">로그인</string>
+    <string name="btn_logout">로그아웃</string>
+    <string name="login_success">로그인 성공!</string>
+    <string name="login_failed">로그인 실패</string>
+    
+    <!-- Settings -->
+    <string name="title_settings">설정</string>
+    <string name="enable_auto_reply">자동 답글 활성화</string>
+    <string name="enable_accessibility">접근성 서비스 활성화</string>
+    <string name="reply_message_label">답글 메시지</string>
+    <string name="default_reply_message">댓글 감사합니다!</string>
+    <string name="btn_save_settings">설정 저장</string>
+    <string name="settings_saved">설정이 저장되었습니다</string>
+    
+    <!-- Notification Types -->
+    <string name="notif_new_comment">새 댓글</string>
+    <string name="notif_new_like">좋아요</string>
+    <string name="notif_new_work">새 작품 공유</string>
+    <string name="notif_reply">답글</string>
+    <string name="notif_follow">팔로우</string>
+    
+    <!-- Status -->
+    <string name="status_monitoring">알림 감지 중…</string>
+    <string name="status_idle">대기 중</string>
+    <string name="accessibility_not_enabled">접근성 서비스가 비활성화되어 있습니다</string>
+    <string name="open_accessibility_settings">접근성 설정 열기</string>
+</resources>

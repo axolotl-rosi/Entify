@@ -1,0 +1,230 @@
+Entify Source-Available License v1.0
+시행일 / Effective date: 2026-10-14
+Copyright (c) 2026 Axolotl_rosi
+Developed under Eniwan Studio
+
+이 라이선스에서 "Axolotl_rosi"는 해당 필명을 사용하는 개인 저작자를 의미합니다.
+"Eniwan Studio"는 개발 그룹의 명칭이며, 별도로 명시하지 않는 한
+독립적인 저작권자로 표시한 것이 아닙니다.
+
+이 라이선스는 한국어 본문과 영어 번역문으로 구성됩니다. 내용이 서로 다르게
+해석되는 경우 한국어 본문을 우선합니다. 관련 법률상 배제할 수 없는 권리는
+어느 언어의 문구로도 제한되지 않습니다.
+
+========================
+한국어 — 라이선스 본문
+========================
+
+제1조. 적용 대상과 권리 귀속
+1. 이 라이선스는 Axolotl_rosi가 저작권을 보유하거나 이용 허가를 부여할
+   권한을 가진 Entify의 독자적인 소스코드, 문서 및 기타 자료(이하
+   "Entify 자체 자료")에만 적용됩니다.
+2. 이 라이선스는 AndroidX, Jetpack Compose, Room, OkHttp, Coil 등
+   제3자 자료의 라이선스와 해당 라이선스가 허용하는 권리를 변경하거나
+   제한하지 않습니다. 제3자 자료의 저작권은 각각의 권리자에게 있습니다.
+3. Entify의 소스코드가 공개되어 있다는 사실만으로 공개된 자료 전체에
+   자유로운 수정·재배포 권한이 부여되는 것은 아닙니다. 이 라이선스는
+   OSI 정의에 따른 오픈소스 라이선스가 아닙니다.
+
+제2조. 공식 배포본의 무료 이용 및 콘텐츠 수익화
+1. 이용자는 공식적으로 배포된 수정되지 않은 Entify를 합법적인 목적에
+   무료로 다운로드, 설치 및 실행할 수 있습니다.
+2. 공식 Entify를 도구로 사용하여 알림을 확인하고 엔트리 활동을 하거나,
+   영상·방송·교육 콘텐츠 등에서 Entify 구동 화면을 노출하며 수익을 창출할 수 있습니다.
+3. 이러한 콘텐츠 수익화는 Entify 자체 자료의 상업적 재사용·판매·재배포와
+   구별되며, 제4조에서 금지하는 상업적 재사용으로 보지 않습니다.
+4. 이용자가 제작한 콘텐츠에 대한 권리를 이 라이선스에 따라 Axolotl_rosi에게
+   이전하는 것은 아닙니다. 단, 이용한 제3자 저작물에 대한 별도의 권리와
+   이용 조건은 준수해야 합니다.
+
+제3조. 소스 열람 및 비공개 학습·연구
+1. 공개된 Entify 자체 자료는 열람하고 구조와 동작을 분석할 수 있습니다.
+2. 개인적인 비상업적 학습·연구·테스트를 위해 합리적인 범위에서 해당 자료를
+   복제하거나 수정하여 비공개로 실험할 수 있습니다.
+3. 위 허가는 수정본이나 복제본을 다른 사람에게 공개·공유·전송·배포하거나
+   불특정 다수가 접근할 수 있도록 호스팅할 권한을 포함하지 않습니다.
+4. 적용 법률의 예외 규정, 제3자 라이선스 또는 저장소 호스팅 플랫폼의
+   약관에 따라 독립적으로 부여된 권리는 이 조항으로 제한하지 않습니다.
+
+제4조. 사전 서면 허가가 필요한 행위
+적용 법률, 제3자 라이선스 또는 호스팅 플랫폼의 약관에서 독립적으로
+허용하는 경우를 제외하고, 다음 행위에는 Axolotl_rosi 또는 그로부터
+적법하게 권한을 위임받은 대리인의 사전 서면 허가가 필요합니다.
+가. Entify 자체 자료의 원본 또는 수정본을 외부에 재배포, 미러링,
+    재패키징, 재라이선스하거나 공개적으로 호스팅하는 행위
+나. Entify 자체 자료를 포함하는 수정판·포크·파생 배포본을 공개하거나
+    타인에게 전달하는 행위
+다. Entify 자체 자료를 다른 소프트웨어·확장 프로그램·서비스에 통합하여
+    배포하거나 상업적으로 재사용하는 행위
+라. Entify 자체 자료 또는 그 복제본·수정본을 판매하거나 유상으로
+    라이선스하는 등 직접적인 상업적 이익을 위해 활용하는 행위
+공식 배포 페이지로 연결되는 링크를 공유하는 것은 허용됩니다.
+
+제5조. 허가받은 배포의 출처 표기 및 변경 사항 고지
+별도 서면 허가를 받아 Entify 자체 자료를 배포하는 경우, 해당 허가에서
+명시적으로 달리 정하지 않는 한 다음 조건을 모두 준수해야 합니다.
+가. 원래의 저작권 표시와 이 라이선스 전문을 유지할 것
+나. 원저작자 Axolotl_rosi와 원프로젝트 Entify를 명시할 것
+다. 수정 사항을 명확히 표시하고 수정본을 공식 배포본으로 오인시키지 않을 것
+라. 해당하는 제3자 라이선스 전문, NOTICE 및 저작권 고지를 유지할 것
+단순히 출처를 표시했다는 사실만으로 배포 허가를 얻는 것은 아닙니다.
+
+제6조. 공식 협업 및 개별 허가
+1. Axolotl_rosi는 공식 협업자 또는 특정 개인·단체에 대해 수정·사용·배포
+   권한을 별도의 서면 합의로 허가할 수 있습니다.
+2. 공식 협업에 참여했다는 사실, 저장소에 이슈나 Pull Request를 제출한
+   사실만으로 수정본 배포 권한이 자동으로 부여되지는 않습니다.
+3. 허가는 허가받는 대상, 자료, 허용 행위, 기간 및 기타 조건을 명확히
+   기재해야 하며, 허가받은 범위를 넘어서는 사용은 허용되지 않습니다.
+4. 별도 합의가 없는 한 이러한 허가는 저작권의 양도를 의미하지 않으며,
+   다른 기여자가 소유한 저작권까지 이전하거나 대신 허락하지 않습니다.
+
+제7조. 이름·로고·공식 명칭
+1. 이 라이선스는 "Entify", "Eniwan Studio"의 이름, 로고, 시각적
+   식별 요소에 대한 별도 상표·브랜드 사용 권한을 부여하지 않습니다.
+2. 공식 프로젝트를 사칭하거나, 권한 없이 공식 인증·제휴·승인을 받은 것처럼
+   표시하거나, 무단 배포본을 공식 버전으로 소개해서는 안 됩니다.
+3. 출처를 알리기 위한 정확하고 오해의 소지가 없는 명칭 언급 등 법률상
+   허용되는 이용은 제한하지 않습니다.
+
+제8조. 보증 부인 및 책임 제한
+1. Entify 자체 자료 및 공식 배포본은 적용 법률이 허용하는 범위에서
+   어떠한 명시적·묵시적 보증 없이 "있는 그대로(AS IS)" 제공됩니다.
+2. 적용 법률이 허용하는 범위에서, 저작권자는 Entify의 사용 또는
+   사용 불능으로 발생한 손해에 대한 책임을 제한합니다.
+3. 고의·중대한 과실을 포함하여 관계 법령상 배제하거나 제한할 수 없는
+   책임과 이용자의 법정 권리는 이 조항으로 배제하거나 제한하지 않습니다.
+
+제9조. 권리 유보와 위반
+1. 이 라이선스에서 명시적으로 허용하지 않은 Entify 자체 자료에 관한
+   모든 권리는 권리자에게 유보됩니다.
+2. 허가된 이용은 이 라이선스의 준수를 조건으로 하며, 위반 시 관련 법률에
+   따라 허가가 종료되거나 권리 행사 대상이 될 수 있습니다.
+3. 법률상 예외와 제3자 라이선스에 의해 독립적으로 부여되는 권리는 영향을
+   받지 않습니다.
+
+제10조. 라이선스 개정
+1. Axolotl_rosi는 이후 개정판을 공표하거나 개별적인 사용 허가를
+   별도로 제공할 수 있습니다.
+2. 새 버전의 공표만으로 이미 유효하게 부여된 구버전의 이용 권한이
+   자동으로 소멸하는 것은 아닙니다. 다만 해당 허가와 적용 법률에서
+   달리 정한 경우에는 그에 따릅니다.
+
+제3자 자료에 관한 중요 고지
+Entify에는 AndroidX, Jetpack Compose, Room, OkHttp, Coil, AndroidSVG 등의
+제3자 오픈소스 소프트웨어가 포함되어 있으며, 해당 부분은 각각의 라이선스
+(주로 Apache License 2.0)에 따라 별도로 제공됩니다. 상세한 내역은
+THIRD_PARTY_LICENSES.md를 참고하세요. 이 라이선스는 해당 제3자 자료의
+독립적인 이용 권한을 제한하지 않습니다.
+
+========================
+English — Translation
+========================
+
+Entify Source-Available License v1.0
+Effective date: 2026-10-14
+Copyright (c) 2026 Axolotl_rosi
+Developed under Eniwan Studio
+
+For the purposes of this License, "Axolotl_rosi" refers to the individual author
+using that pseudonym. "Eniwan Studio" is the name of the development group and is
+not identified as a separate copyright holder unless otherwise expressly stated.
+
+This License is provided in Korean and English. In the event of an inconsistency,
+the Korean text controls. Nothing in either version limits rights that cannot
+lawfully be restricted.
+
+1. Scope and ownership
+This License applies only to Entify's original source code, documentation, and
+other materials that Axolotl_rosi owns or has authority to license (the "Entify
+Materials"). It does not replace or limit the licenses or independently granted
+rights applicable to third-party materials, including AndroidX and Jetpack components
+licensed under Apache License 2.0. No ownership of third-party materials is
+claimed. Publication of source code does not, by itself, grant broad rights to
+modify or redistribute it. This is not an OSI-approved open-source license.
+
+2. Free use of official releases and monetized content
+You may download, install, and run official, unmodified Entify releases free of
+charge for lawful purposes. You may use the official application to receive
+notifications and interact with Entry, and display or stream the application in
+content such as videos, livestreams, and educational materials. Monetizing content
+created or displayed using Entify as a tool is not prohibited commercial reuse
+of the Entify Materials. This License does not transfer ownership of your own
+content to Axolotl_rosi. Third-party rights and terms still apply.
+
+3. Source access and private study
+You may view and analyze publicly available Entify Materials and make reasonable
+private copies or modifications solely for your own noncommercial study, testing,
+or research. This permission does not include publishing, sharing, transmitting,
+distributing, or publicly hosting copies or modifications. Nothing here limits
+rights independently granted by applicable law, third-party licenses, or a
+repository hosting platform's terms.
+
+4. Actions requiring prior written permission
+Except where independently permitted by applicable law, applicable third-party
+licenses, or hosting platform terms, you must obtain prior written authorization
+from Axolotl_rosi or a duly authorized representative before:
+(a) distributing, mirroring, repackaging, sublicensing, or publicly hosting the
+    Entify Materials in original or modified form;
+(b) publishing or providing modified builds, forks, or derivative distributions
+    containing the Entify Materials;
+(c) incorporating the Entify Materials into another software product, extension,
+    or service for distribution or commercial reuse; or
+(d) selling, licensing for payment, or otherwise directly commercially exploiting
+    the Entify Materials or copies or modifications of them.
+You may link to an authorized official download page.
+
+5. Attribution and changes in authorized distributions
+If you receive separate written authorization to distribute Entify Materials,
+you must, unless that authorization expressly states otherwise:
+(a) preserve original copyright notices and the complete text of this License;
+(b) identify Axolotl_rosi as the original author and Entify as the original project;
+(c) clearly identify your changes and avoid presenting modified builds as official;
+    and
+(d) retain all applicable third-party license texts, NOTICE files, and copyright
+    attributions.
+Attribution alone does not grant redistribution permission.
+
+6. Official collaborations and individual exceptions
+Axolotl_rosi may grant identified collaborators, individuals, or organizations
+separate written permission to modify, use, or distribute Entify Materials on
+specified terms. Collaboration, discussions, issues, or pull requests alone do
+not automatically confer distribution rights. Any grant should identify its
+recipient, covered materials, permitted activities, duration, and conditions.
+It does not transfer copyrights unless expressly agreed and does not grant
+rights owned by other contributors.
+
+7. Names, logos, and official status
+No separate trademark or branding rights in the names "Entify" or "Eniwan
+Studio," or their logos and visual identity, are granted by this License. You
+must not impersonate the official project, falsely claim sponsorship, approval,
+or affiliation, or present an unauthorized distribution as an official version.
+Accurate, non-misleading references permitted by law remain unaffected.
+
+8. Disclaimer of warranty and limitation of liability
+TO THE EXTENT PERMITTED BY APPLICABLE LAW, THE ENTIFY MATERIALS AND OFFICIAL
+RELEASES ARE PROVIDED "AS IS," WITHOUT WARRANTIES OF ANY KIND. TO THE EXTENT
+PERMITTED BY APPLICABLE LAW, THE COPYRIGHT HOLDER LIMITS LIABILITY FOR DAMAGES
+ARISING FROM THEIR USE OR INABILITY TO USE THEM. NOTHING HERE EXCLUDES OR LIMITS
+LIABILITY OR STATUTORY RIGHTS THAT CANNOT LAWFULLY BE EXCLUDED OR LIMITED,
+INCLUDING LIABILITY FOR INTENTIONAL MISCONDUCT OR GROSS NEGLIGENCE WHERE
+APPLICABLE.
+
+9. Reservation of rights and compliance
+All rights in the Entify Materials not expressly granted are reserved. The
+permissions in this License depend on compliance with its terms. A breach may
+result in termination of permission or enforcement of rights, subject to
+applicable law. Statutory exceptions and independently granted third-party
+rights remain unaffected.
+
+10. License revisions
+Axolotl_rosi may publish revised versions of this License or offer separately
+negotiated permissions. A new version does not automatically cancel valid rights
+already granted under an earlier version unless that grant or applicable law
+provides otherwise.
+
+IMPORTANT THIRD-PARTY NOTICE
+Certain components (AndroidX, Jetpack Compose, Room, OkHttp, Coil, AndroidSVG)
+are separately licensed under Apache License 2.0. See THIRD_PARTY_LICENSES.md
+for applicable terms and attributions. This License does not restrict those
+independent third-party rights.

@@ -1,0 +1,154 @@
+# 🔔 Entify
+
+> **엔트리(PlayEntry) 실시간 백그라운드 푸시 알림 및 통계 매니저**
+
+Entify는 엔트리 공식 웹/앱에서 실시간으로 발생하는 알림(댓글, 답글, 좋아요, 팔로우, 리메이크, 공유, 시스템 공지 등)을 백그라운드 포그라운드 서비스 및 GraphQL API를 통해 10초 주기로 감지하고, 풍부한 미디어 썸네일과 함께 시스템 상단 푸시 알림으로 전달해 주는 Android 오픈소스 애플리케이션입니다.
+
+---
+
+## ✨ 핵심 기능 (Features)
+
+1. **실시간 백그라운드 푸시 알림 (Foreground Data-Sync Service)**
+   - 앱을 닫거나 스마트폰 화면이 꺼진 상태에서도 WakeLock과 포그라운드 서비스를 통해 주기적으로 알림을 감지합니다.
+   - 프로필 아바타, 작품 썸네일, 감정 뱃지(❤️, 🤖, ⚠️)가 적용된 풍부한 알림을 제공합니다.
+
+2. **알림 감시 마스터 토글 (Master Monitoring Toggle)**
+   - 알림 감시 자체를 켜고 끌 수 있는 메인 스위치를 제공합니다. 감시가 꺼져 있을 때는 네트워크 폴링을 즉시 중단합니다.
+
+3. **스와이프 지움 기억 (Swipe Dismiss Tracking)**
+   - 사용자가 상단 알림 바에서 직접 스와이프하여 지운 알림은 앱이 다시 시작되거나 백그라운드에서 재감지되어도 다시 울리지 않습니다.
+   - 단, 사용자가 직접 밀어서 지운 것이 아닌 비정상 종료나 기기 재부팅 시에는 알림이 안전하게 보존됩니다.
+
+4. **유저별 알림 종류 맞춤 필터링 (Per-User Category Filter)**
+   - 특정 유저의 알림을 무조건 차단하는 대신, 유저마다 원하는 알림 종류(`댓글`, `좋아요`, `팔로우`, `공유`)를 선택하여 맞춤 필터링할 수 있습니다.
+   - 전체 차단 또는 카테고리별 차단을 원클릭 토글할 수 있습니다.
+
+5. **방해금지 시간대 설정 (Do Not Disturb - Quiet Hours)**
+   - 수면 시간이나 집중 시간(예: 23:00 ~ 07:00)을 설정하면, 해당 시간대 동안은 백그라운드 알림 감시를 일시 정지하여 배터리를 아끼고 방해받지 않습니다.
+
+6. **영구 알림 보관함 & 통계 (Permanent Archive & Stats)**
+   - 피드에서 일반 알림을 비우더라도, 수신된 모든 원본 알림은 로컬 Room SQLite DB에 영구 보존됩니다.
+   - 보관함 검색, 카테고리별 통계, 즐겨찾기 보관 기능을 지원합니다.
+
+7. **Vercel 원클릭 웹 다운로드 사이트 지원**
+   - 구글 플레이 스토어 없이도 Vercel을 통해 모바일 웹 브라우저에서 직접 원클릭으로 최신 APK를 다운로드하고 설치할 수 있는 웹사이트가 내장되어 있습니다.
+
+---
+
+## 🏗️ 아키텍처 및 기술 스택
+
+- **UI**: Jetpack Compose, Material 3, Material Icons Extended
+- **아키텍처**: MVVM Pattern, Kotlin Coroutines & Flow
+- **로컬 데이터베이스**: Room Persistence Library (SQLite), SharedPreferences
+- **네트워크**: OkHttp 4, PlayEntry GraphQL API (`SELECT_TOPICS`, `project`, `userProfile`), Headless WebView Token Extraction
+- **이미지 로딩**: Coil Compose, AndroidSVG
+- **시스템 연동**: Android Foreground Service (`dataSync`), BroadcastReceiver (`BootReceiver`, `NotificationDismissReceiver`), PowerManager WakeLock
+
+---
+
+## 📁 프로젝트 구조
+
+```
+Entify/
+├── app/
+│   ├── src/main/java/com/example/entify_again/
+│   │   ├── MainActivity.kt                      # 메인 진입점, 토큰 추출, 네비게이션
+│   │   ├── classifier/                          # 알림 분류 로직
+│   │   ├── data/
+│   │   │   ├── db/EntifyDatabase.kt             # Room DB 정의
+│   │   │   ├── entity/NotificationEntity.kt     # 알림 및 아카이브 엔티티
+│   │   │   └── repository/                      # 알림 Repository
+│   │   ├── receiver/
+│   │   │   ├── BootReceiver.kt                  # 재부팅 복구 리시버
+│   │   │   └── NotificationDismissReceiver.kt   # 스와이프 지움 감지 리시버
+│   │   ├── service/
+│   │   │   └── EntryPollingForegroundService.kt # 10초 주기 백그라운드 감시 서비스
+│   │   ├── ui/
+│   │   │   ├── screen/                          # Compose 화면 (피드, 보관함, 필터, 설정)
+│   │   │   ├── theme/                           # 머티리얼3 테마 및 다크 모드
+│   │   │   └── viewmodel/                       # ViewModels
+│   │   └── util/
+│   │       ├── PreferenceManager.kt             # 설정, DND, 필터, 중복 방지 저장소
+│   │       ├── UserProfileFetcher.kt            # 엔트리 프로필 및 프로젝트 메타 GraphQL 추출
+│   │       └── EntryTemplateFormatter.kt        # 알림 템플릿 파서
+│   └── build.gradle.kts                         # 릴리즈 서명 및 의존성 설정
+├── web/
+│   ├── index.html                               # Vercel 원클릭 배포 및 설치 매니저 페이지
+│   └── vercel.json                              # Vercel MIME 라우팅 설정
+├── README.md
+└── THIRD_PARTY_LICENSES.md                      # 서드파티 오픈소스 고지사항
+```
+
+---
+
+## 🚀 빌드 및 실행 가이드
+
+### 개발 환경 요구 사항
+- Android Studio Hedgehog (2023.1.1) 이상
+- JDK 11 or 17
+- Android SDK 34 (Android 14) / Min SDK 24 (Android 7.0)
+
+### 1. 디버그 빌드
+```bash
+./gradlew assembleDebug
+```
+빌드된 APK는 `app/build/outputs/apk/debug/app-debug.apk`에 생성됩니다.
+
+### 2. 릴리즈 배포용 APK 빌드 (웹 배포용)
+`app/build.gradle.kts`에 기본 서명 설정이 완료되어 있어 별도의 복잡한 서명 키 설정 없이 바로 설치 가능한 릴리즈 APK 생성이 가능합니다:
+```bash
+./gradlew assembleRelease
+```
+생성된 APK 경로:
+```
+app/build/outputs/apk/release/app-release.apk
+```
+
+---
+
+## 🌐 Vercel 웹 설치 매니저 배포 방법
+
+`web/` 디렉토리에 정적 설치 웹사이트가 마련되어 있습니다.
+
+1. **APK 복사**:
+   ```bash
+   cp app/build/outputs/apk/release/app-release.apk web/app-release.apk
+   ```
+2. **Vercel 배포**:
+   - [Vercel](https://vercel.com)에 로그인한 뒤, `web/` 디렉토리를 연결하여 배포하거나 CLI를 사용합니다:
+   ```bash
+   cd web
+   vercel --prod
+   ```
+3. 사용자가 해당 Vercel 도메인으로 접속하면 안드로이드 모바일 기기에서 **원클릭으로 `Entify.apk`를 즉시 다운로드하고 설치 가이드를 확인**할 수 있습니다.
+
+---
+
+## 📤 GitHub 레포지토리 등록 방법
+
+[https://github.com/dashboard](https://github.com/dashboard)에서 새 저장소를 생성하여 본 프로젝트를 오픈소스로 공개할 수 있습니다:
+
+```bash
+# 1. 깃 초기화 및 브랜치 설정
+git init
+git branch -M main
+
+# 2. 파일 추가 및 커밋
+git add .
+git commit -m "Initial commit: Entify notification client with filtering, DND, and Vercel web installer"
+
+# 3. 원격 저장소 연결 (예: your-username/Entify)
+git remote add origin https://github.com/<YOUR_GITHUB_USERNAME>/Entify.git
+
+# 4. 푸시
+git push -u origin main
+```
+
+---
+
+## 📄 License & Third-Party Notices
+
+- **프로젝트 라이선스**: 본 프로젝트는 **Entify Source-Available License v1.0**을 따릅니다. 공식 배포본의 개인적 이용 및 콘텐츠 제작은 무료이나 무단 상업적 재배포는 제한됩니다. 상세 내용은 [LICENSE](LICENSE)를 참조하세요.
+- **제3자 오픈소스 소프트웨어 규정**: 프로젝트에서 사용된 AndroidX, Jetpack Compose, Room, Coil, OkHttp, AndroidSVG 등의 오픈소스 고지 및 Apache 2.0 라이선스 전문은 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)에 상세히 기술되어 있습니다.
+
+
