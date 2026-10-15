@@ -11,6 +11,7 @@ class PreferenceManager(context: Context) {
     private val appContext = context.applicationContext
     private val prefs: SharedPreferences =
         appContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+    private val secureSession = SecureSessionStore(appContext)
     
     companion object {
         private const val PREF_NAME = "entify_prefs"
@@ -67,8 +68,22 @@ class PreferenceManager(context: Context) {
     }
 
     init {
+        migrateLegacySessionSecrets()
         _themeModeFlow.value = themeMode
         prefs.registerOnSharedPreferenceChangeListener(prefChangeListener)
+    }
+
+    private fun migrateLegacySessionSecrets() {
+        val legacy = listOf(KEY_CSRF_TOKEN, KEY_X_TOKEN, KEY_COOKIES)
+        if (secureSession.isAvailable) {
+            legacy.forEach { key ->
+                if (secureSession.get(key).isNullOrBlank()) {
+                    secureSession.put(key, prefs.getString(key, null))
+                }
+            }
+        }
+        // Never retain a plaintext copy, even if Keystore initialization failed.
+        prefs.edit().apply { legacy.forEach(::remove) }.commit()
     }
 
     private fun getTodayDateString(): String {
@@ -117,24 +132,33 @@ class PreferenceManager(context: Context) {
     
     // CSRF 토큰
     var csrfToken: String?
-        get() = prefs.getString(KEY_CSRF_TOKEN, null)?.trim('"', '\'', ' ')
+        get() = secureSession.get(KEY_CSRF_TOKEN)?.trim('"', '\'', ' ')
         set(value) {
             val sanitized = value?.trim('"', '\'', ' ')
-            prefs.edit().putString(KEY_CSRF_TOKEN, sanitized).apply()
+            secureSession.put(KEY_CSRF_TOKEN, sanitized)
         }
     
     // X-Token (새로운 인증 토큰)
     var xToken: String?
-        get() = prefs.getString(KEY_X_TOKEN, null)?.trim('"', '\'', ' ')
+        get() = secureSession.get(KEY_X_TOKEN)?.trim('"', '\'', ' ')
         set(value) {
             val sanitized = value?.trim('"', '\'', ' ')
-            prefs.edit().putString(KEY_X_TOKEN, sanitized).apply()
+            secureSession.put(KEY_X_TOKEN, sanitized)
         }
 
     // 세션 쿠키
     var cookies: String?
-        get() = prefs.getString(KEY_COOKIES, null)
-        set(value) = prefs.edit().putString(KEY_COOKIES, value).apply()
+        get() = secureSession.get(KEY_COOKIES)
+        set(value) = secureSession.put(KEY_COOKIES, value)
+
+    fun clearSessionSecrets() {
+        secureSession.clear()
+        prefs.edit()
+            .remove(KEY_CSRF_TOKEN)
+            .remove(KEY_X_TOKEN)
+            .remove(KEY_COOKIES)
+            .apply()
+    }
 
     // 로그아웃 대기 상태
     var logoutPending: Boolean
@@ -505,6 +529,7 @@ class PreferenceManager(context: Context) {
 
     // 모든 데이터 삭제 (로그아웃)
     fun clearAll() {
+        clearSessionSecrets()
         prefs.edit().clear().apply()
     }
 }

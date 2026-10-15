@@ -308,7 +308,7 @@ fun NotificationCard(
                                     )
                                     Spacer(modifier = Modifier.width(3.dp))
                                     Text(
-                                        text = "차단됨",
+                                        text = "알림 숨김",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.error,
                                         fontWeight = FontWeight.Bold
@@ -575,7 +575,7 @@ fun NotificationCard(
 
                                 if (notification.isBlocked) {
                                     DropdownMenuItem(
-                                        text = { Text("차단 해제") },
+                                        text = { Text("알림 다시 표시") },
                                         leadingIcon = {
                                             Icon(
                                                 Icons.Default.LockOpen,
@@ -590,7 +590,7 @@ fun NotificationCard(
                                     )
                                 } else {
                                     DropdownMenuItem(
-                                        text = { Text("이 사용자 차단") },
+                                        text = { Text("이 사용자의 알림 숨기기") },
                                         leadingIcon = {
                                             Icon(
                                                 Icons.Default.Block,

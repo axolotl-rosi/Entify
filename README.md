@@ -4,6 +4,13 @@
 
 Entify는 엔트리 공식 웹/앱에서 실시간으로 발생하는 알림(댓글, 답글, 좋아요, 팔로우, 리메이크, 공유, 시스템 공지 등)을 백그라운드 포그라운드 서비스 및 GraphQL API를 통해 10초 주기로 감지하고, 풍부한 미디어 썸네일과 함께 시스템 상단 푸시 알림으로 전달해 주는 Android 오픈소스 애플리케이션입니다.
 
+현재 배포 버전은 **v1.1.0 (versionCode 2)**입니다. Entify는 엔트리와 독립적으로 개발된 비공식 클라이언트입니다.
+
+- [설치 페이지](https://entify-download.vercel.app/)
+- [보안 구조와 취약점 신고](SECURITY.md)
+- [개인정보·세션 처리 설명](PRIVACY.md)
+- [APK 설치와 해시 검증](docs/INSTALLATION.md)
+
 ---
 
 ## ✨ 핵심 기능 (Features)
@@ -20,8 +27,8 @@ Entify는 엔트리 공식 웹/앱에서 실시간으로 발생하는 알림(댓
    - 단, 사용자가 직접 밀어서 지운 것이 아닌 비정상 종료나 기기 재부팅 시에는 알림이 안전하게 보존됩니다.
 
 4. **유저별 알림 종류 맞춤 필터링 (Per-User Category Filter)**
-   - 특정 유저의 알림을 무조건 차단하는 대신, 유저마다 원하는 알림 종류(`댓글`, `좋아요`, `팔로우`, `공유`)를 선택하여 맞춤 필터링할 수 있습니다.
-   - 전체 차단 또는 카테고리별 차단을 원클릭 토글할 수 있습니다.
+   - 특정 사용자의 알림을 공격적으로 "차단"하는 표현 대신, 사용자마다 피드에서 숨길 알림 종류(`댓글`, `좋아요`, `팔로우`, `공유`)를 선택할 수 있습니다.
+   - 전체 숨기기 또는 종류별 숨기기를 원클릭으로 설정할 수 있습니다.
 
 5. **방해금지 시간대 설정 (Do Not Disturb - Quiet Hours)**
    - 수면 시간이나 집중 시간(예: 23:00 ~ 07:00)을 설정하면, 해당 시간대 동안은 백그라운드 알림 감시를 일시 정지하여 배터리를 아끼고 방해받지 않습니다.
@@ -39,7 +46,7 @@ Entify는 엔트리 공식 웹/앱에서 실시간으로 발생하는 알림(댓
 
 - **UI**: Jetpack Compose, Material 3, Material Icons Extended
 - **아키텍처**: MVVM Pattern, Kotlin Coroutines & Flow
-- **로컬 데이터베이스**: Room Persistence Library (SQLite), SharedPreferences
+- **로컬 데이터베이스**: Room Persistence Library (SQLite), SharedPreferences, Android Keystore 기반 암호화 세션 저장소
 - **네트워크**: OkHttp 4, PlayEntry GraphQL API (`SELECT_TOPICS`, `project`, `userProfile`), Headless WebView Token Extraction
 - **이미지 로딩**: Coil Compose, AndroidSVG
 - **시스템 연동**: Android Foreground Service (`dataSync`), BroadcastReceiver (`BootReceiver`, `NotificationDismissReceiver`), PowerManager WakeLock
@@ -69,6 +76,7 @@ Entify/
 │   │   │   └── viewmodel/                       # ViewModels
 │   │   └── util/
 │   │       ├── PreferenceManager.kt             # 설정, DND, 필터, 중복 방지 저장소
+│   │       ├── SecureSessionStore.kt             # Keystore 기반 쿠키·토큰 암호화 저장소
 │   │       ├── UserProfileFetcher.kt            # 엔트리 프로필 및 프로젝트 메타 GraphQL 추출
 │   │       └── EntryTemplateFormatter.kt        # 알림 템플릿 파서
 │   └── build.gradle.kts                         # 릴리즈 서명 및 의존성 설정
@@ -95,7 +103,7 @@ Entify/
 빌드된 APK는 `app/build/outputs/apk/debug/app-debug.apk`에 생성됩니다.
 
 ### 2. 릴리즈 배포용 APK 빌드 (웹 배포용)
-`app/build.gradle.kts`에 기본 서명 설정이 완료되어 있어 별도의 복잡한 서명 키 설정 없이 바로 설치 가능한 릴리즈 APK 생성이 가능합니다:
+공개 업데이트용 APK는 반드시 이전 배포와 같은 안전한 서명 키로 서명해야 합니다. 저장소에는 서명 키나 비밀번호를 커밋하지 않습니다:
 ```bash
 ./gradlew assembleRelease
 ```
@@ -103,6 +111,8 @@ Entify/
 ```
 app/build/outputs/apk/release/app-release.apk
 ```
+
+빌드 산출물이 서명되었는지는 Android SDK의 `apksigner verify --print-certs`로 확인하세요. 서명되지 않은 릴리즈를 배포하거나 디버그 APK를 공개 배포본으로 대체하지 마세요.
 
 ---
 
@@ -120,7 +130,21 @@ app/build/outputs/apk/release/app-release.apk
    cd web
    vercel --prod
    ```
-3. 사용자가 해당 Vercel 도메인으로 접속하면 안드로이드 모바일 기기에서 **원클릭으로 `Entify.apk`를 즉시 다운로드하고 설치 가이드를 확인**할 수 있습니다.
+3. SHA-256 값을 `web/index.html`의 검증 안내와 일치시키고, 배포 뒤 실제 다운로드 파일의 해시와 보안 응답 헤더를 다시 확인합니다.
+
+---
+
+## 🔐 세션·쿠키·토큰 보안
+
+- 비밀번호는 Entify가 저장하지 않으며, 사용자는 `https://playentry.org` 공식 로그인 화면에서 로그인합니다.
+- 세션 쿠키와 CSRF/x-token은 Android Keystore로 보호되는 암호화 저장소에만 보관합니다.
+- 구버전 평문 세션은 앱 시작 시 암호화 저장소로 이전한 뒤 삭제하며, Keystore 오류 시 평문 저장으로 낮추지 않습니다.
+- 앱 설정, 데이터베이스와 파일은 Android 클라우드 백업 및 기기 이전에서 제외됩니다.
+- 세션을 다루는 WebView는 원격 디버깅, HTTP 혼합 콘텐츠, 제3자 쿠키, 파일 접근을 차단합니다.
+- 화면 캡처와 최근 앱 미리보기를 제한하고, 로그에 토큰·쿠키·전체 요청 헤더를 남기지 않습니다.
+- 인증 정보는 Entify 중계 서버가 아니라 엔트리 HTTPS API로 기기에서 직접 전송됩니다.
+
+세부 데이터 흐름, 위협 모델, 한계와 신고 절차는 [SECURITY.md](SECURITY.md)를 확인하세요. API 호환성에 민감한 요청 URL·헤더·본문 형식은 이번 보안 강화에서 변경하지 않았습니다.
 
 ---
 

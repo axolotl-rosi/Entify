@@ -24,8 +24,7 @@ enum class FeedFilter(val label: String) {
     REMAKE("리메이크"),
     SHARE("공유"),
     SYSTEM("시스템"),
-    STARRED("즐겨찾기"),
-    BLOCKED("차단된 알림")
+    STARRED("즐겨찾기")
 }
 
 data class FeedUiState(
@@ -47,7 +46,6 @@ class FeedViewModel(
             when (filter) {
                 FeedFilter.ALL -> repository.getAllNotifications()
                 FeedFilter.STARRED -> repository.getStarred()
-                FeedFilter.BLOCKED -> repository.getBlocked()
                 FeedFilter.SYSTEM -> repository.getSystemNotifications()
                 else -> repository.getByCategory(filter.name)
             }.map { notifications ->
@@ -135,11 +133,7 @@ class FeedViewModel(
 
     fun clearAll() {
         viewModelScope.launch {
-            if (_activeFilter.value == FeedFilter.BLOCKED) {
-                repository.deleteByBlockedStatus(true)
-            } else {
-                repository.deleteByBlockedStatus(false)
-            }
+            repository.deleteByBlockedStatus(false)
         }
     }
 

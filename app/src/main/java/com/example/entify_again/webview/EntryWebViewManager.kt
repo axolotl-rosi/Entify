@@ -7,6 +7,8 @@ import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.WebSettings
+import android.webkit.WebResourceRequest
 import com.example.entify_again.util.PreferenceManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -18,6 +20,16 @@ import kotlin.coroutines.resume
  * 로그인, GraphQL 쿼리 실행, 댓글 작성 등을 처리합니다
  */
 class EntryWebViewManager(private val context: Context) {
+
+    private open inner class TrustedEntryWebViewClient : WebViewClient() {
+        override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+            val uri = request?.url ?: return true
+            if (uri.toString() == "about:blank") return false
+            val host = uri.host?.lowercase(java.util.Locale.ROOT) ?: return true
+            return !uri.scheme.equals("https", ignoreCase = true) ||
+                (host != "playentry.org" && !host.endsWith(".playentry.org"))
+        }
+    }
     
     companion object {
         private const val TAG = "EntryWebViewManager"
@@ -38,12 +50,17 @@ class EntryWebViewManager(private val context: Context) {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             settings.databaseEnabled = true
+            settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+            settings.allowFileAccess = false
+            settings.allowContentAccess = false
+            settings.setGeolocationEnabled(false)
+            CookieManager.getInstance().setAcceptThirdPartyCookies(this, false)
             // 데스크톱 User-Agent로 고정 (Chrome on Windows)
             settings.userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             settings.useWideViewPort = true
             settings.loadWithOverviewMode = true
 
-            webViewClient = WebViewClient()
+            webViewClient = TrustedEntryWebViewClient()
             addJavascriptInterface(JSInterface(), "Android")
 
             webView = this
@@ -58,7 +75,7 @@ class EntryWebViewManager(private val context: Context) {
         return@withContext suspendCancellableCoroutine { continuation ->
             val web = webView ?: initWebView()
             
-            web.webViewClient = object : WebViewClient() {
+            web.webViewClient = object : TrustedEntryWebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
                     
@@ -189,7 +206,7 @@ class EntryWebViewManager(private val context: Context) {
             }
             
             web.loadUrl(ENTRY_URL)
-            web.webViewClient = object : WebViewClient() {
+            web.webViewClient = object : TrustedEntryWebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
                     view?.evaluateJavascript(script, null)
                 }
@@ -354,7 +371,7 @@ class EntryWebViewManager(private val context: Context) {
             }
             
             web.loadUrl(ENTRY_URL)
-            web.webViewClient = object : WebViewClient() {
+            web.webViewClient = object : TrustedEntryWebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
                     view?.evaluateJavascript(script, null)
                 }
@@ -462,7 +479,7 @@ class EntryWebViewManager(private val context: Context) {
             }
 
             web.loadUrl(ENTRY_URL)
-            web.webViewClient = object : WebViewClient() {
+            web.webViewClient = object : TrustedEntryWebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
                     view?.evaluateJavascript(script, null)
                 }
@@ -546,7 +563,7 @@ class EntryWebViewManager(private val context: Context) {
             }
 
             web.loadUrl(profileUrl)
-            web.webViewClient = object : WebViewClient() {
+            web.webViewClient = object : TrustedEntryWebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
                     view?.evaluateJavascript(script, null)
                 }
@@ -659,7 +676,7 @@ class EntryWebViewManager(private val context: Context) {
             }
 
             web.loadUrl(projectUrl)
-            web.webViewClient = object : WebViewClient() {
+            web.webViewClient = object : TrustedEntryWebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
                     view?.evaluateJavascript(script, null)
                 }

@@ -77,14 +77,14 @@ fun FilterManageScreen(
 
         Divider(modifier = Modifier.padding(vertical = 16.dp))
 
-        // User filters section (차단된 사용자 관리)
+        // User-specific notification controls
         Text(
-            text = "차단된 사용자 관리",
+            text = "사용자별 알림 관리",
             style = MaterialTheme.typography.titleSmall,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
         Text(
-            text = "차단된 사용자의 알림은 메인 피드에서 숨겨지고 '차단된 알림' 공간으로 분리됩니다.",
+            text = "사용자마다 피드에서 숨길 알림 종류를 선택할 수 있습니다.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp)
@@ -132,12 +132,12 @@ fun FilterManageScreen(
                     },
                     enabled = inputHexOrNick.isNotBlank()
                 ) {
-                    Text("차단")
+                    Text("관리 추가")
                 }
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "차단할 유저의 마이페이지 주소 또는 24자리 Hex ID를 입력해주세요.",
+                text = "알림을 관리할 사용자의 마이페이지 주소 또는 24자리 Hex ID를 입력해주세요.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
             )
@@ -148,7 +148,7 @@ fun FilterManageScreen(
         // Blocked users list
         if (uiState.blockedUsers.isEmpty()) {
             Text(
-                text = "현재 차단된 사용자가 없습니다.",
+                text = "별도로 알림을 관리 중인 사용자가 없습니다.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -205,7 +205,7 @@ fun FilterManageScreen(
 
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "차단할 알림 종류:",
+                            text = "피드에서 숨길 알림 종류:",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -221,7 +221,7 @@ fun FilterManageScreen(
                             FilterChip(
                                 selected = user.isBlockAll,
                                 onClick = { viewModel.setUserBlockAll(idForFilter, !user.isBlockAll) },
-                                label = { Text("전체 차단", style = MaterialTheme.typography.labelSmall) }
+                                label = { Text("전체 숨기기", style = MaterialTheme.typography.labelSmall) }
                             )
                             val filterCategories = listOf(
                                 "COMMENT" to "댓글",
@@ -271,8 +271,8 @@ fun FilterManageScreen(
     if (showSelfBlockEasterEgg) {
         AlertDialog(
             onDismissRequest = { showSelfBlockEasterEgg = false },
-            title = { Text("차단 불가") },
-            text = { Text("본인까지 차단하시면 제가 누구 알림을 가져오나요ㅠㅠ") },
+            title = { Text("설정할 수 없음") },
+            text = { Text("내 계정의 알림은 사용자별 관리 대상에서 제외됩니다.") },
             confirmButton = {
                 TextButton(onClick = { showSelfBlockEasterEgg = false }) {
                     Text("확인")

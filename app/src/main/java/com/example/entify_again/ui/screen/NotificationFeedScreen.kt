@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
@@ -41,7 +40,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.entify_again.data.entity.NotificationEntity
@@ -74,8 +72,6 @@ fun NotificationFeedScreen(
     var pendingNavigateLink by remember { mutableStateOf<String?>(null) }
     var lightboxMedia by remember { mutableStateOf<Pair<String, String>?>(null) }
     var userToBlock by remember { mutableStateOf<NotificationEntity?>(null) }
-
-    val isBlockedTab = uiState.activeFilter == FeedFilter.BLOCKED
 
     val allFilteredNotifications = uiState.notifications
     val totalPages = maxOf(1, (allFilteredNotifications.size + pageSize - 1) / pageSize)
@@ -137,11 +133,7 @@ fun NotificationFeedScreen(
             TopAppBar(
                 title = {
                     Text(
-                        when {
-                            isBlockedTab -> "차단된 알림"
-                            unreadCount > 0 -> "알림 ($unreadCount)"
-                            else -> "알림"
-                        }
+                        if (unreadCount > 0) "알림 ($unreadCount)" else "알림"
                     )
                 },
                 actions = {
@@ -178,26 +170,17 @@ fun NotificationFeedScreen(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(
-                        imageVector = if (isBlockedTab) Icons.Default.Block else Icons.Default.NotificationsNone,
+                        imageVector = Icons.Default.NotificationsNone,
                         contentDescription = null,
                         modifier = Modifier.size(64.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = if (isBlockedTab) "차단된 알림이 없습니다." else "알림이 없습니다",
+                        text = "알림이 없습니다",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    if (isBlockedTab) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "사용자를 차단하면 해당 사용자의 알림이 이곳에 보관됩니다.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                            textAlign = TextAlign.Center
-                        )
-                    }
                 }
             }
         } else {
@@ -334,15 +317,15 @@ fun NotificationFeedScreen(
         )
     }
 
-    // 2. 사용자 차단 확인 다이얼로그
+    // 2. 사용자별 알림 숨김 확인 다이얼로그
     userToBlock?.let { target ->
         AlertDialog(
             onDismissRequest = { userToBlock = null },
-            title = { Text("사용자 차단") },
+            title = { Text("사용자별 알림 관리") },
             text = {
                 Text(
-                    "'${target.actor}' 사용자를 차단하시겠습니까?\n\n" +
-                        "차단된 사용자의 알림은 메인 피드에서 숨겨지며, '차단된 알림' 탭으로 분리됩니다."
+                    "'${target.actor}' 사용자의 알림을 피드에서 숨길까요?\n\n" +
+                        "나중에 사용자별 알림 관리에서 다시 표시할 수 있습니다."
                 )
             },
             confirmButton = {
@@ -350,7 +333,7 @@ fun NotificationFeedScreen(
                     viewModel.blockUser(target)
                     userToBlock = null
                 }) {
-                    Text("차단", color = MaterialTheme.colorScheme.error)
+                    Text("숨기기", color = MaterialTheme.colorScheme.primary)
                 }
             },
             dismissButton = {

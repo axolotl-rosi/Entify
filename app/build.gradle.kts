@@ -12,8 +12,8 @@ android {
         applicationId = "com.example.entify_again"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -80,6 +80,7 @@ dependencies {
 
     // WebView
     implementation("androidx.webkit:webkit:1.8.0")
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")

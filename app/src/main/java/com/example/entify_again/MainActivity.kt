@@ -37,6 +37,7 @@ import android.app.AlertDialog
 import android.widget.EditText
 import android.view.ViewGroup
 import android.view.View
+import android.view.WindowManager
 import android.content.Context
 import android.content.SharedPreferences
 import kotlin.math.abs
@@ -108,6 +109,14 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
 class MainActivity : ComponentActivity() {
+
+    private fun isTrustedEntryNavigation(uri: Uri?): Boolean {
+        if (uri == null) return false
+        if (uri.toString() == "about:blank") return true
+        if (!uri.scheme.equals("https", ignoreCase = true)) return false
+        val host = uri.host?.lowercase(java.util.Locale.ROOT) ?: return false
+        return host == "playentry.org" || host.endsWith(".playentry.org")
+    }
     private val client = OkHttpClient()
     private val entryUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     private lateinit var preferenceManager: PreferenceManager
@@ -1025,8 +1034,7 @@ class MainActivity : ComponentActivity() {
         
         AndroidLog.d("LOGIN_CHECK", "🔍 로그인 상태 확인:")
         AndroidLog.d("LOGIN_CHECK", "  - isLoggedIn: $isLoggedIn")
-        AndroidLog.d("LOGIN_CHECK", "  - xToken: ${xToken?.take(10)}... (길이: ${xToken?.length})")
-        AndroidLog.d("LOGIN_CHECK", "  - csrfToken: ${csrfToken?.take(10)}... (길이: ${csrfToken?.length})")
+        AndroidLog.d("LOGIN_CHECK", "  - session tokens present: ${!xToken.isNullOrBlank() && !csrfToken.isNullOrBlank()}")
         
         val result = isLoggedIn && !xToken.isNullOrBlank() && !csrfToken.isNullOrBlank()
         AndroidLog.d("LOGIN_CHECK", "  - 결과: $result")
@@ -1150,7 +1158,7 @@ class MainActivity : ComponentActivity() {
             }
             try {
                 cm.setAcceptCookie(true)
-                targetWebView?.let { runCatching { cm.setAcceptThirdPartyCookies(it, true) } }
+                targetWebView?.let { runCatching { cm.setAcceptThirdPartyCookies(it, false) } }
 
                 val savedCookiesRaw = preferenceManager.cookies
                 val savedCookies = sanitizeCookieHeader(savedCookiesRaw) ?: savedCookiesRaw
@@ -1276,7 +1284,7 @@ class MainActivity : ComponentActivity() {
             .getOrDefault(false)
         AndroidLog.d(
             tag,
-            "[$stage] url=$url referer=$referer cookieManagerSnapshotLen=$cookieSnapshotLen cookieHasCsrf=$cookieHasCsrf cookieCsrfPrefix=${cookieCsrf?.take(16) ?: ""} cookieHasPlayentryToken=$cookieHasToken restoreAgeMs=$restoreAge readyState=$readyState ua=${ua.take(80)} thirdParty=$thirdParty"
+            "[$stage] url=$url referer=$referer cookieManagerSnapshotLen=$cookieSnapshotLen cookieHasCsrf=$cookieHasCsrf cookieHasPlayentryToken=$cookieHasToken restoreAgeMs=$restoreAge readyState=$readyState thirdParty=$thirdParty"
         )
     }
 
@@ -1285,12 +1293,6 @@ class MainActivity : ComponentActivity() {
         val url = request.url?.toString() ?: return
         if (!url.startsWith("https://playentry.org/graphql")) return
         val headers = request.requestHeaders ?: emptyMap()
-        val headerJson = JSONObject()
-        headers.forEach { (key, value) ->
-            try {
-                headerJson.put(key, value)
-            } catch (_: Exception) {}
-        }
         val interestingKeys = listOf(
             "Referer",
             "Origin",
@@ -1309,7 +1311,7 @@ class MainActivity : ComponentActivity() {
         }
         AndroidLog.d(
             "GRAPHQL_INTERCEPT",
-            "[$source] method=${request.method} url=$url highlight={$highlight} headers=$headerJson"
+            "[$source] method=${request.method} url=$url highlight={$highlight}"
         )
     }
 
@@ -2261,6 +2263,7 @@ class MainActivity : ComponentActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         val prevHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             AndroidLog.e("FATAL_CRASH", "Uncaught exception in ${thread.name}: ${throwable.message}", throwable)
@@ -2278,10 +2281,8 @@ class MainActivity : ComponentActivity() {
         syncNotificationMemoryPolicy(force = true)
         restoreCookiesIntoWebView(null, force = true, reason = "startup")
 
-        // Enable WebView debugging (DEBUG 전용)
-        if (BuildConfig.DEBUG) {
-            try { WebView.setWebContentsDebuggingEnabled(true) } catch (_: Exception) {}
-        }
+        // Session-bearing WebViews must never be exposed through remote debugging.
+        try { WebView.setWebContentsDebuggingEnabled(false) } catch (_: Exception) {}
 
         ensureNotificationSetup()
 
@@ -2336,7 +2337,10 @@ class MainActivity : ComponentActivity() {
                                     AndroidLog.d("MAIN_WEBVIEW", "Main WebView instance created (loggedIn=${preferenceManager.isLoggedIn})")
                                     settings.javaScriptEnabled = true
                                     settings.domStorageEnabled = true
-                                    settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                                    settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                                    settings.allowFileAccess = false
+                                    settings.allowContentAccess = false
+                                    settings.setGeolocationEnabled(false)
                                     settings.cacheMode = WebSettings.LOAD_NO_CACHE
                                     // ✅ 하얀 화면 문제 해결: 명시적 배경색 설정
                                     setBackgroundColor(android.graphics.Color.WHITE)
@@ -2347,7 +2351,7 @@ class MainActivity : ComponentActivity() {
                                     // ✅ 쿠키 허용 (여기 수정됨!!)
                                     val cookieManager = CookieManager.getInstance()
                                     cookieManager.setAcceptCookie(true)
-                                    cookieManager.setAcceptThirdPartyCookies(this, true) // ← this가 WebView!
+                                    cookieManager.setAcceptThirdPartyCookies(this, false)
                                     cookieManager.flush()
                                     webChromeClient = object : WebChromeClient() {
                                         // ✅ 3️⃣ onProgressChanged → onPageFinished로 JS 실행 위치 복귀
@@ -2365,13 +2369,16 @@ class MainActivity : ComponentActivity() {
                                             val newWebView = WebView(ctx).apply {
                                                 settings.javaScriptEnabled = true
                                                 settings.domStorageEnabled = true
-                                                settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                                                settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                                                settings.allowFileAccess = false
+                                                settings.allowContentAccess = false
+                                                settings.setGeolocationEnabled(false)
                                                 applyEmulatorLayerWorkaround()
                                             }
 
                                             val cm = CookieManager.getInstance()
                                             cm.setAcceptCookie(true)
-                                            cm.setAcceptThirdPartyCookies(newWebView, true)
+                                            cm.setAcceptThirdPartyCookies(newWebView, false)
                                             cm.flush()
 
                                             val dialog = Dialog(ctx)
@@ -2392,6 +2399,10 @@ class MainActivity : ComponentActivity() {
                                                     super.onPageFinished(v, url)
                                                     v?.evaluateJavascript(jsTokenInjector, null)
                                                 }
+
+                                                override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                                                    return !isTrustedEntryNavigation(request?.url)
+                                                }
                                             }
 
                                             (resultMsg?.obj as? WebView.WebViewTransport)?.webView = newWebView
@@ -2399,15 +2410,8 @@ class MainActivity : ComponentActivity() {
                                             return true
                                         }
                                         override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
-                                            try {
-                                                val msg = consoleMessage?.message() ?: ""
-                                                if (msg.contains("Invalid regular expression flags")) return true
-                                                AndroidLog.d(
-                                                    "WebViewConsole",
-                                                    msg + " @" + (consoleMessage?.sourceId() ?: "") + ":" + (consoleMessage?.lineNumber() ?: -1)
-                                                )
-                                            } catch (_: Exception) {}
-                                            return super.onConsoleMessage(consoleMessage)
+                                            // Console output can contain session-bearing page data.
+                                            return true
                                         }
                                     }
 
@@ -2418,8 +2422,12 @@ class MainActivity : ComponentActivity() {
                                         }
 
                                         override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-                                            // ✅ 1️⃣ shouldOverrideUrlLoading을 false로 되돌리기 (내부 링크 허용)
-                                            return false // 내부 링크 허용 (기존 백업처럼)
+                                            val uri = request?.url ?: return true
+                                            if (isTrustedEntryNavigation(uri)) return false
+                                            if (uri.scheme.equals("https", ignoreCase = true)) {
+                                                runCatching { startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+                                            }
+                                            return true
                                         }
 
                                         override fun shouldInterceptRequest(
@@ -6113,7 +6121,7 @@ class MainActivity : ComponentActivity() {
                 factory = { ctx ->
                     WebView(ctx).apply {
                         settings.javaScriptEnabled = false
-                        settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                        settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                         setBackgroundColor(0x00000000)
                         AndroidLog.d("RemoteImage", "<svg> load via WebView: " + cleanUrl)
                         val html = """
@@ -6142,7 +6150,7 @@ class MainActivity : ComponentActivity() {
                     factory = { ctx ->
                         WebView(ctx).apply {
                             settings.javaScriptEnabled = false
-                            settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                            settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                             setBackgroundColor(0x00000000)
                             AndroidLog.d("RemoteImage", "fallback <img> via WebView: " + cleanUrl)
                             val html = """
@@ -6190,7 +6198,7 @@ class MainActivity : ComponentActivity() {
                                 settings.javaScriptEnabled = false
                                 settings.loadsImagesAutomatically = true
                                 settings.blockNetworkImage = false
-                                settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                                settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                                 setBackgroundColor(0x00000000)
                             }
                             val html = """
@@ -6241,7 +6249,7 @@ class MainActivity : ComponentActivity() {
                                 settings.javaScriptEnabled = false
                                 settings.loadsImagesAutomatically = true
                                 settings.blockNetworkImage = false
-                                settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                                settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                                 setBackgroundColor(0x00000000)
                             }
                             val html = """
@@ -9511,7 +9519,7 @@ class MainActivity : ComponentActivity() {
         }
         AndroidLog.d(
             "SHARE_GRAPHQL",
-            "Using stored tokens for projectId=$projectId (xToken=${xToken.take(12)}..., csrf=${csrfToken.take(8)}...)"
+            "Using encrypted session for projectId=$projectId"
         )
         val targetWebView = prepareShareGraphqlContext(projectId) ?: run {
             AndroidLog.w("SHARE_GRAPHQL", "Project WebView unavailable for projectId=$projectId")
@@ -9632,7 +9640,7 @@ class MainActivity : ComponentActivity() {
         }
         AndroidLog.d(
             "FOLLOW_GRAPHQL",
-            "Using stored tokens for userId=$userId (xToken=${xToken.take(12)}..., csrf=${csrfToken.take(8)}...)"
+            "Using encrypted session for userId=$userId"
         )
         val targetWebView = prepareFollowGraphqlContext(userId) ?: run {
             AndroidLog.w("FOLLOW_GRAPHQL", "Profile WebView unavailable for userId=$userId")
@@ -9903,7 +9911,7 @@ class MainActivity : ComponentActivity() {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             settings.cacheMode = WebSettings.LOAD_NO_CACHE
-            settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+            settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
 
             webViewClient = object : WebViewClient() {
                 override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
@@ -10057,7 +10065,7 @@ class MainActivity : ComponentActivity() {
 
         CookieManager.getInstance().apply {
             setAcceptCookie(true)
-            setAcceptThirdPartyCookies(profileWebView, true)
+            setAcceptThirdPartyCookies(profileWebView, false)
         }
         // ✅ WebView를 화면에 추가 (필수!)
         (window.decorView as ViewGroup).addView(profileWebView)
@@ -10380,7 +10388,7 @@ class MainActivity : ComponentActivity() {
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true // 프로필 추출을 위해 필요
-                mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                 cacheMode = WebSettings.LOAD_NO_CACHE
                 loadsImagesAutomatically = false // 이미지 렌더링 차단 → GPU 사용 0
                 setSupportZoom(false)
@@ -10416,7 +10424,7 @@ class MainActivity : ComponentActivity() {
             addJavascriptInterface(object {
                 @JavascriptInterface
                 fun postMessage(msg: String) {
-                    AndroidLog.d("JS_BRIDGE", "[HIDDEN] $msg")
+                    AndroidLog.d("JS_BRIDGE", "[HIDDEN] event received")
                     runOnUiThread { onJsMessage(msg, "HIDDEN") }
                 }
             }, "AndroidApp")
@@ -10424,7 +10432,7 @@ class MainActivity : ComponentActivity() {
 
         // 쿠키와 세션을 메인 WebView와 공유
         CookieManager.getInstance().setAcceptCookie(true)
-        CookieManager.getInstance().setAcceptThirdPartyCookies(hiddenWebView, true)
+        CookieManager.getInstance().setAcceptThirdPartyCookies(hiddenWebView, false)
         // ✅ ① View 트리에 추가 (필수: 안 그러면 WebView 초기화 안 됨)
         (findViewById<ViewGroup>(android.R.id.content)).addView(hiddenWebView)
     }
@@ -10443,7 +10451,7 @@ class MainActivity : ComponentActivity() {
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
-                mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                 cacheMode = WebSettings.LOAD_NO_CACHE
                 loadsImagesAutomatically = false
             }
@@ -10509,7 +10517,7 @@ class MainActivity : ComponentActivity() {
             addJavascriptInterface(object {
                 @JavascriptInterface
                 fun postMessage(message: String) {
-                    AndroidLog.d("JS_BRIDGE", "[FOLLOW] $message")
+                    AndroidLog.d("JS_BRIDGE", "[FOLLOW] event received")
                     runOnUiThread { onJsMessage(message, "FOLLOW") }
                 }
             }, "AndroidApp")
@@ -10517,7 +10525,7 @@ class MainActivity : ComponentActivity() {
 
         CookieManager.getInstance().apply {
             setAcceptCookie(true)
-            followGraphqlWebView?.let { setAcceptThirdPartyCookies(it, true) }
+            followGraphqlWebView?.let { setAcceptThirdPartyCookies(it, false) }
         }
         (findViewById<ViewGroup>(android.R.id.content)).addView(followGraphqlWebView)
     }
@@ -10546,7 +10554,7 @@ class MainActivity : ComponentActivity() {
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
-                mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                 cacheMode = WebSettings.LOAD_NO_CACHE
                 loadsImagesAutomatically = false
             }
@@ -10609,7 +10617,7 @@ class MainActivity : ComponentActivity() {
             addJavascriptInterface(object {
                 @JavascriptInterface
                 fun postMessage(message: String) {
-                    AndroidLog.d("JS_BRIDGE", "[SHARE] $message")
+                    AndroidLog.d("JS_BRIDGE", "[SHARE] event received")
                     runOnUiThread { onJsMessage(message, "SHARE") }
                 }
             }, "AndroidApp")
@@ -10617,7 +10625,7 @@ class MainActivity : ComponentActivity() {
 
         CookieManager.getInstance().apply {
             setAcceptCookie(true)
-            shareGraphqlWebView?.let { setAcceptThirdPartyCookies(it, true) }
+            shareGraphqlWebView?.let { setAcceptThirdPartyCookies(it, false) }
         }
         (findViewById<ViewGroup>(android.R.id.content)).addView(shareGraphqlWebView)
     }
@@ -10645,7 +10653,7 @@ class MainActivity : ComponentActivity() {
             applyEmulatorLayerWorkaround()
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
-            settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+            settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
             settings.cacheMode = WebSettings.LOAD_NO_CACHE
             settings.loadsImagesAutomatically = false
 
@@ -10682,7 +10690,7 @@ class MainActivity : ComponentActivity() {
             addJavascriptInterface(object {
                 @JavascriptInterface
                 fun postMessage(message: String) {
-                    AndroidLog.d("JS_BRIDGE", "[TOKEN] $message")
+                    AndroidLog.d("JS_BRIDGE", "[TOKEN] event received")
                     runOnUiThread { onJsMessage(message, "TOKEN") }
                 }
             }, "AndroidApp")
@@ -10690,7 +10698,7 @@ class MainActivity : ComponentActivity() {
 
         CookieManager.getInstance().apply {
             setAcceptCookie(true)
-            setAcceptThirdPartyCookies(tokenWebView, true)
+            setAcceptThirdPartyCookies(tokenWebView, false)
         }
         (window.decorView as ViewGroup).addView(tokenWebView)
         AndroidLog.d("TOKEN_BOOTSTRAP", "Token WebView attached")
@@ -10773,7 +10781,7 @@ class MainActivity : ComponentActivity() {
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
-                mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                 cacheMode = WebSettings.LOAD_NO_CACHE
                 loadsImagesAutomatically = false
                 setSupportZoom(false)
@@ -10897,7 +10905,7 @@ class MainActivity : ComponentActivity() {
             addJavascriptInterface(object {
                 @JavascriptInterface
                 fun postMessage(msg: String) {
-                    AndroidLog.d("JS_BRIDGE", "[ALARM] $msg")
+                    AndroidLog.d("JS_BRIDGE", "[ALARM] event received")
                     runOnUiThread { onJsMessage(msg, "ALARM") }
                 }
             }, "AndroidApp")
@@ -10905,7 +10913,7 @@ class MainActivity : ComponentActivity() {
 
         val cm = CookieManager.getInstance()
         cm.setAcceptCookie(true)
-        cm.setAcceptThirdPartyCookies(alarmWebView, true)
+        cm.setAcceptThirdPartyCookies(alarmWebView, false)
         (findViewById<ViewGroup>(android.R.id.content)).addView(alarmWebView)
     }
 
@@ -12972,7 +12980,7 @@ class MainActivity : ComponentActivity() {
 
     // ✅ 공통 JS 메시지 핸들러 (메인/숨김 WebView 공통)
     private fun onJsMessage(message: String, origin: String) {
-        AndroidLog.d("JS_BRIDGE", "[$origin] $message")
+        AndroidLog.d("JS_BRIDGE", "[$origin] event received")
         
         if (message == "TOKEN_REFRESH_OK") {
             pendingTokenRefresh?.complete(true)
@@ -13073,7 +13081,7 @@ class MainActivity : ComponentActivity() {
                     if (sameX && !sameCsrf && csrfToken.isNotBlank()) {
                         AndroidLog.d(
                             "TOKEN_SAVE",
-                            "CSRF 갱신: ${preferenceManager.csrfToken?.take(10)}... → ${csrfToken.take(10)}..."
+                            "CSRF session value refreshed"
                         )
                         preferenceManager.csrfToken = csrfToken
                         markTokensReady()
@@ -13100,8 +13108,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 AndroidLog.d("TOKEN_SAVE", "🔑 새로운 토큰 저장!")
-                AndroidLog.d("TOKEN_SAVE", "  - xToken: ${xToken.take(10)}... (길이: ${xToken.length})")
-                AndroidLog.d("TOKEN_SAVE", "  - csrfToken: ${csrfToken.take(10)}... (길이: ${csrfToken.length})")
+                AndroidLog.d("TOKEN_SAVE", "  - required session values received")
 
                 if (xToken.isNotBlank() && csrfToken.isNotBlank()) {
                     // PreferenceManager에 토큰 저장
@@ -13116,7 +13123,7 @@ class MainActivity : ComponentActivity() {
                         if (!cookieStr.isNullOrBlank()) {
                             preferenceManager.cookies = cookieStr
                             AndroidLog.d("TOKEN_SAVE", "  - cookies 저장됨 (len=${cookieStr.length})")
-                            AndroidLog.d("TOKEN_SAVE", "  - cookies preview: ${cookieStr.take(120)}")
+                            AndroidLog.d("TOKEN_SAVE", "  - session cookies captured")
                         } else {
                             AndroidLog.w("TOKEN_SAVE", "  - 저장할 쿠키 없음")
                         }
@@ -13137,8 +13144,7 @@ class MainActivity : ComponentActivity() {
 
                     AndroidLog.d("TOKEN_SAVE", "✅ 토큰 저장 완료!")
                     AndroidLog.d("TOKEN_SAVE", "  - isLoggedIn: ${preferenceManager.isLoggedIn}")
-                    AndroidLog.d("TOKEN_SAVE", "  - xToken 저장됨: ${preferenceManager.xToken?.take(10)}...")
-                    AndroidLog.d("TOKEN_SAVE", "  - csrfToken 저장됨: ${preferenceManager.csrfToken?.take(10)}...")
+                    AndroidLog.d("TOKEN_SAVE", "  - encrypted session storage updated")
                     markTokensReady()
                     syncForegroundPollingService("tokens_saved")
 
@@ -13155,7 +13161,7 @@ class MainActivity : ComponentActivity() {
                         scheduleStartupFlow("tokens_saved")
                     }
                 } else {
-                    AndroidLog.w("TOKEN_SAVE", "❌ 토큰이 비어있음: xToken='$xToken', csrfToken='$csrfToken'")
+                    AndroidLog.w("TOKEN_SAVE", "Required session values were empty")
                 }
             } catch (e: Exception) {
                 AndroidLog.e("TOKEN_SAVE", "토큰 저장 실패: ${e.message}")

@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.FilterChip
@@ -41,7 +40,6 @@ fun FilterChipRow(
                 FeedFilter.SHARE -> CategoryColors.Share
                 FeedFilter.SYSTEM -> CategoryColors.System
                 FeedFilter.STARRED -> CategoryColors.Like
-                FeedFilter.BLOCKED -> MaterialTheme.colorScheme.error
                 else -> MaterialTheme.colorScheme.primary
             }
             FilterChip(
@@ -51,9 +49,6 @@ fun FilterChipRow(
                 leadingIcon = when (filter) {
                     FeedFilter.STARRED -> {
                         { Icon(Icons.Default.Star, contentDescription = null, modifier = Modifier.padding(end = 2.dp)) }
-                    }
-                    FeedFilter.BLOCKED -> {
-                        { Icon(Icons.Default.Block, contentDescription = null, modifier = Modifier.padding(end = 2.dp)) }
                     }
                     FeedFilter.SYSTEM -> {
                         { Icon(Icons.Default.SmartToy, contentDescription = null, modifier = Modifier.padding(end = 2.dp)) }
