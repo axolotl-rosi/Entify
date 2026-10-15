@@ -38,7 +38,9 @@ jobs:
       - name: Run tests, lint, and release build
         env:
           ENTIFY_SIGNING_MODE: legacy
-        run: ./gradlew testDebugUnitTest lintDebug assembleRelease --no-daemon
+        run: |
+          chmod +x gradlew
+          ./gradlew testDebugUnitTest lintDebug assembleRelease --no-daemon
 
       - name: Record release checksum
         shell: bash
