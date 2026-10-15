@@ -2,14 +2,15 @@
 
 > **엔트리(PlayEntry) 실시간 백그라운드 푸시 알림 및 통계 매니저**
 
-Entify는 엔트리 공식 웹/앱에서 실시간으로 발생하는 알림(댓글, 답글, 좋아요, 팔로우, 리메이크, 공유, 시스템 공지 등)을 백그라운드 포그라운드 서비스 및 GraphQL API를 통해 10초 주기로 감지하고, 풍부한 미디어 썸네일과 함께 시스템 상단 푸시 알림으로 전달해 주는 Android 오픈소스 애플리케이션입니다.
+Entify는 엔트리 공식 웹/앱에서 실시간으로 발생하는 알림(댓글, 답글, 좋아요, 팔로우, 리메이크, 공유, 시스템 공지 등)을 백그라운드 포그라운드 서비스 및 GraphQL API를 통해 10초 주기로 감지하고, 풍부한 미디어 썸네일과 함께 시스템 상단 푸시 알림으로 전달해 주는 Android 소스 공개(Source-Available) 애플리케이션입니다.
 
-현재 배포 버전은 **v1.1.0 (versionCode 2)**입니다. Entify는 엔트리와 독립적으로 개발된 비공식 클라이언트입니다.
+현재 배포 버전은 **v1.1.1 (versionCode 3)**입니다. Entify는 엔트리와 독립적으로 개발된 비공식 클라이언트입니다.
 
 - [설치 페이지](https://entify-download.vercel.app/)
 - [보안 구조와 취약점 신고](SECURITY.md)
 - [개인정보·세션 처리 설명](PRIVACY.md)
 - [APK 설치와 해시 검증](docs/INSTALLATION.md)
+- [릴리스 서명 운영 정책](docs/RELEASE_SIGNING.md)
 
 ---
 
@@ -103,7 +104,7 @@ Entify/
 빌드된 APK는 `app/build/outputs/apk/debug/app-debug.apk`에 생성됩니다.
 
 ### 2. 릴리즈 배포용 APK 빌드 (웹 배포용)
-공개 업데이트용 APK는 반드시 이전 배포와 같은 안전한 서명 키로 서명해야 합니다. 저장소에는 서명 키나 비밀번호를 커밋하지 않습니다:
+기본 `legacy` 모드는 기존 설치본과의 업데이트 호환성을 위해 초기 인증서를 유지합니다. 전용 운영 키를 쓰는 `production` 모드는 필수 환경 변수가 하나라도 없으면 빌드에 실패합니다. 저장소에는 서명 키나 비밀번호를 커밋하지 않습니다:
 ```bash
 ./gradlew assembleRelease
 ```
@@ -112,7 +113,7 @@ Entify/
 app/build/outputs/apk/release/app-release.apk
 ```
 
-빌드 산출물이 서명되었는지는 Android SDK의 `apksigner verify --print-certs`로 확인하세요. 서명되지 않은 릴리즈를 배포하거나 디버그 APK를 공개 배포본으로 대체하지 마세요.
+빌드 산출물이 서명되었는지는 Android SDK의 `apksigner verify --print-certs`로 확인하세요. 전환 방법과 키 보관 원칙은 [릴리스 서명 운영 정책](docs/RELEASE_SIGNING.md)을 따릅니다.
 
 ---
 
@@ -150,7 +151,7 @@ app/build/outputs/apk/release/app-release.apk
 
 ## 📤 GitHub 레포지토리 등록 방법
 
-[https://github.com/dashboard](https://github.com/dashboard)에서 새 저장소를 생성하여 본 프로젝트를 오픈소스로 공개할 수 있습니다:
+[https://github.com/dashboard](https://github.com/dashboard)에서 새 저장소를 생성하여 본 프로젝트의 소스 코드를 공개할 수 있습니다:
 
 ```bash
 # 1. 깃 초기화 및 브랜치 설정

@@ -1,7 +1,7 @@
 package com.example.entify_again.service
 
 import android.accessibilityservice.AccessibilityService
-import android.util.Log
+import com.example.entify_again.util.PrivacyLog as Log
 import android.view.accessibility.AccessibilityEvent
 import com.example.entify_again.handler.AutoReplyHandler
 import com.example.entify_again.util.PreferenceManager

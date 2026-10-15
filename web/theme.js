@@ -17,7 +17,7 @@
 
     if (button) {
       const isLight = theme === "light";
-      button.textContent = isLight ? "🌙 다크" : "☀️ 라이트";
+      button.textContent = isLight ? "다크 모드" : "라이트 모드";
       button.setAttribute("aria-label", isLight ? "다크 테마로 전환" : "라이트 테마로 전환");
       button.setAttribute("aria-pressed", String(isLight));
     }
@@ -29,5 +29,45 @@
     const nextTheme = theme === "dark" ? "light" : "dark";
     applyTheme(nextTheme);
     try { localStorage.setItem("entify-theme", nextTheme); } catch (_) {}
+  });
+
+  document.querySelectorAll("details").forEach(function (details) {
+    const summary = details.querySelector("summary");
+    if (!summary) return;
+    let animation = null;
+
+    summary.addEventListener("click", function (event) {
+      event.preventDefault();
+      if (animation) {
+        animation.cancel();
+        animation = null;
+      }
+
+      const startHeight = details.offsetHeight;
+      const opening = !details.open;
+      if (opening) details.open = true;
+      const endHeight = opening ? details.scrollHeight : summary.offsetHeight;
+
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        details.open = opening;
+        details.style.height = "";
+        return;
+      }
+
+      const currentAnimation = details.animate(
+        { height: [startHeight + "px", endHeight + "px"] },
+        { duration: 380, easing: "cubic-bezier(0.4, 0, 0.2, 1)" }
+      );
+      animation = currentAnimation;
+      currentAnimation.onfinish = function () {
+        details.open = opening;
+        details.style.height = "";
+        if (animation === currentAnimation) animation = null;
+      };
+      currentAnimation.oncancel = function () {
+        details.style.height = "";
+        if (animation === currentAnimation) animation = null;
+      };
+    });
   });
 })();

@@ -6,7 +6,7 @@ title Entify GitHub 배포 스크립트
 cd /d "%~dp0"
 
 echo ========================================================
-echo       Entify 깃허브 오픈소스 자동 등록 및 푸시 매니저
+echo       Entify 깃허브 소스 코드 공개 저장소 등록 및 푸시 매니저
 echo ========================================================
 echo.
 
@@ -77,7 +77,7 @@ git push -u origin main
 if %ERRORLEVEL% EQU 0 (
     echo.
     echo ========================================================
-    echo  🎉 축하합니다! GitHub에 Entify 저장소가 오픈소스로 배포되었습니다!
+    echo  🎉 축하합니다! GitHub에 Entify 저장소(Source-Available) 배포가 완료되었습니다!
     echo  주소: https://github.com/%GH_USER%/Entify
     echo ========================================================
 ) else (

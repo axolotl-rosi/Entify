@@ -10,7 +10,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.app.Person as NotificationPerson
 import org.json.JSONObject
-import android.util.Log as AndroidLog
+import com.example.entify_again.util.PrivacyLog as AndroidLog
 import android.widget.Toast
 import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Paint

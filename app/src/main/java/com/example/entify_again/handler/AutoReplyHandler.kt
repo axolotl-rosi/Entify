@@ -1,7 +1,7 @@
 package com.example.entify_again.handler
 
 import android.content.Context
-import android.util.Log
+import com.example.entify_again.util.PrivacyLog as Log
 import com.example.entify_again.classifier.NotificationClassifier
 import com.example.entify_again.model.NotificationData
 import com.example.entify_again.model.NotificationType

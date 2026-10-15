@@ -4,6 +4,32 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+val releaseSigningMode = providers.gradleProperty("ENTIFY_SIGNING_MODE")
+    .orElse(providers.environmentVariable("ENTIFY_SIGNING_MODE"))
+    .orElse("legacy")
+    .get()
+val productionSigningValues = mapOf(
+    "storeFile" to providers.gradleProperty("ENTIFY_RELEASE_STORE_FILE")
+        .orElse(providers.environmentVariable("ENTIFY_RELEASE_STORE_FILE")).orNull,
+    "storePassword" to providers.gradleProperty("ENTIFY_RELEASE_STORE_PASSWORD")
+        .orElse(providers.environmentVariable("ENTIFY_RELEASE_STORE_PASSWORD")).orNull,
+    "keyAlias" to providers.gradleProperty("ENTIFY_RELEASE_KEY_ALIAS")
+        .orElse(providers.environmentVariable("ENTIFY_RELEASE_KEY_ALIAS")).orNull,
+    "keyPassword" to providers.gradleProperty("ENTIFY_RELEASE_KEY_PASSWORD")
+        .orElse(providers.environmentVariable("ENTIFY_RELEASE_KEY_PASSWORD")).orNull,
+)
+
+if (releaseSigningMode !in setOf("legacy", "production")) {
+    throw GradleException("ENTIFY_SIGNING_MODE must be either 'legacy' or 'production'.")
+}
+if (releaseSigningMode == "production" && productionSigningValues.values.any { it.isNullOrBlank() }) {
+    throw GradleException(
+        "Production signing requested, but ENTIFY_RELEASE_STORE_FILE, " +
+            "ENTIFY_RELEASE_STORE_PASSWORD, ENTIFY_RELEASE_KEY_ALIAS, and " +
+            "ENTIFY_RELEASE_KEY_PASSWORD are not all configured."
+    )
+}
+
 android {
     namespace = "com.example.entify_again"
     compileSdk = 34
@@ -12,16 +38,33 @@ android {
         applicationId = "com.example.entify_again"
         minSdk = 24
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (releaseSigningMode == "production") {
+            create("production") {
+                storeFile = rootProject.file(productionSigningValues.getValue("storeFile")!!)
+                storePassword = productionSigningValues.getValue("storePassword")
+                keyAlias = productionSigningValues.getValue("keyAlias")
+                keyPassword = productionSigningValues.getValue("keyPassword")
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+                enableV4Signing = true
+            }
+        }
+    }
     buildTypes {
         release {
-            isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = false
+            isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName(
+                if (releaseSigningMode == "production") "production" else "debug"
+            )
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

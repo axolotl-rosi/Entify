@@ -1,6 +1,6 @@
 package com.example.entify_again.util
 
-import android.util.Log
+import com.example.entify_again.util.PrivacyLog as Log
 import android.webkit.CookieManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

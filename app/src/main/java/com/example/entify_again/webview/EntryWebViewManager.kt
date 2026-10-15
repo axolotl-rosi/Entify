@@ -4,15 +4,17 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Log
 import android.webkit.CookieManager
-import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.webkit.WebSettings
 import android.webkit.WebResourceRequest
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import com.example.entify_again.util.PreferenceManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import kotlin.coroutines.resume
 
 /**
@@ -23,11 +25,7 @@ class EntryWebViewManager(private val context: Context) {
 
     private open inner class TrustedEntryWebViewClient : WebViewClient() {
         override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-            val uri = request?.url ?: return true
-            if (uri.toString() == "about:blank") return false
-            val host = uri.host?.lowercase(java.util.Locale.ROOT) ?: return true
-            return !uri.scheme.equals("https", ignoreCase = true) ||
-                (host != "playentry.org" && !host.endsWith(".playentry.org"))
+            return !EntryOriginPolicy.isTrusted(request?.url?.toString())
         }
     }
     
@@ -61,10 +59,43 @@ class EntryWebViewManager(private val context: Context) {
             settings.loadWithOverviewMode = true
 
             webViewClient = TrustedEntryWebViewClient()
-            addJavascriptInterface(JSInterface(), "Android")
+            installTrustedMessageBridge(this)
 
             webView = this
             Log.d(TAG, "WebView 초기화 완료")
+        }
+    }
+
+    private fun installTrustedMessageBridge(target: WebView) {
+        check(WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+            "This Android WebView does not support an origin-scoped message bridge."
+        }
+        WebViewCompat.addWebMessageListener(
+            target,
+            "Android",
+            setOf("https://playentry.org", "https://*.playentry.org")
+        ) { _, message, sourceOrigin, isMainFrame, _ ->
+            if (!isMainFrame || !EntryOriginPolicy.isTrusted(sourceOrigin.toString())) {
+                return@addWebMessageListener
+            }
+            val payload = message.data ?: return@addWebMessageListener
+            handleTrustedBridgeMessage(payload)
+        }
+    }
+
+    private fun handleTrustedBridgeMessage(raw: String) {
+        val message = runCatching { JSONObject(raw) }.getOrNull() ?: return
+        when (message.optString("type")) {
+            "loginResult" -> jsLoginCallback?.invoke(message.optBoolean("success"))
+            "tokensExtracted" -> {
+                prefManager.csrfToken = message.optString("csrf")
+                prefManager.xToken = message.optString("xToken")
+            }
+            "notificationsFetched" -> jsNotificationsCallback?.invoke(message.optString("payload"))
+            "commentPosted" -> jsCommentCallback?.invoke(message.optBoolean("success"))
+            "commentFound" -> jsFindCommentCallback?.invoke(message.optString("payload"))
+            "urlNormalized" -> jsUrlNormalizeCallback?.invoke(message.optString("url"))
+            "profileImageExtracted" -> jsProfileImageCallback?.invoke(message.optString("url"))
         }
     }
     
@@ -74,6 +105,8 @@ class EntryWebViewManager(private val context: Context) {
     suspend fun login(username: String, password: String): Boolean = withContext(Dispatchers.Main) {
         return@withContext suspendCancellableCoroutine { continuation ->
             val web = webView ?: initWebView()
+            val serializedUsername = JSONObject.quote(username)
+            val serializedPassword = JSONObject.quote(password)
             
             web.webViewClient = object : TrustedEntryWebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
@@ -90,8 +123,8 @@ class EntryWebViewManager(private val context: Context) {
                                            document.querySelector('.login-button');
                             
                             if (usernameInput && passwordInput && loginBtn) {
-                                usernameInput.value = '$username';
-                                passwordInput.value = '$password';
+                                usernameInput.value = $serializedUsername;
+                                passwordInput.value = $serializedPassword;
                                 
                                 // 이벤트 트리거
                                 usernameInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -103,11 +136,11 @@ class EntryWebViewManager(private val context: Context) {
                                     // 로그인 성공 확인
                                     setTimeout(() => {
                                         const isLoggedIn = !window.location.href.includes('/login');
-                                        Android.onLoginResult(isLoggedIn.toString());
+                                        Android.postMessage(JSON.stringify({ type: 'loginResult', success: isLoggedIn }));
                                     }, 2000);
                                 }, 500);
                             } else {
-                                Android.onLoginResult('false');
+                                Android.postMessage(JSON.stringify({ type: 'loginResult', success: false }));
                             }
                         })();
                     """.trimIndent()
@@ -145,7 +178,7 @@ class EntryWebViewManager(private val context: Context) {
             (function() {
                 const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
                 const xToken = localStorage.getItem('playentry_token') || '';
-                Android.onTokensExtracted(csrf, xToken);
+                Android.postMessage(JSON.stringify({ type: 'tokensExtracted', csrf, xToken }));
             })();
         """.trimIndent()
         
@@ -194,9 +227,9 @@ class EntryWebViewManager(private val context: Context) {
                         });
                         
                         const data = await res.json();
-                        Android.onNotificationsFetched(JSON.stringify(data));
+                        Android.postMessage(JSON.stringify({ type: 'notificationsFetched', payload: JSON.stringify(data) }));
                     } catch (e) {
-                        Android.onNotificationsFetched('{"error": "' + e.message + '"}');
+                        Android.postMessage(JSON.stringify({ type: 'notificationsFetched', payload: JSON.stringify({ error: String(e) }) }));
                     }
                 })();
             """.trimIndent()
@@ -238,6 +271,8 @@ class EntryWebViewManager(private val context: Context) {
     ): CommentResult? = withContext(Dispatchers.Main) {
         return@withContext suspendCancellableCoroutine { continuation ->
             val web = webView ?: initWebView()
+            val serializedNickname = JSONObject.quote(nickname)
+            val serializedTime = JSONObject.quote(timeString ?: "")
             
             val script = """
                 (async () => {
@@ -259,8 +294,8 @@ class EntryWebViewManager(private val context: Context) {
                         catch { return false; }
                     }
                     
-                    const wantedName = "$nickname".trim().toLowerCase();
-                    const wantedTime = parseEntryTime("$timeString");
+                    const wantedName = $serializedNickname.trim().toLowerCase();
+                    const wantedTime = parseEntryTime($serializedTime);
                     
                     let searchAfter = null;
                     let found = null;
@@ -335,16 +370,16 @@ class EntryWebViewManager(private val context: Context) {
                     }
                     
                     if (found) {
-                        Android.onCommentFound(JSON.stringify({
+                        Android.postMessage(JSON.stringify({ type: 'commentFound', payload: JSON.stringify({
                             nickname: found.user?.nickname || "",
                             created: found.created || "",
                             content: found.content || "",
                             profileImageFilename: found.user?.profileImage?.filename || "",
                             stickerFilename: found.sticker?.filename || "",
                             imageFilename: found.image?.filename || ""
-                        }));
+                        }) }));
                     } else {
-                        Android.onCommentFound("");
+                        Android.postMessage(JSON.stringify({ type: 'commentFound', payload: '' }));
                     }
                 })();
             """.trimIndent()
@@ -391,6 +426,8 @@ class EntryWebViewManager(private val context: Context) {
 
         return@withContext suspendCancellableCoroutine { continuation ->
             val web = webView ?: initWebView()
+            val serializedFilename = JSONObject.quote(filename)
+            val serializedKind = JSONObject.quote(kind)
 
             val script = """
                 (async () => {
@@ -469,8 +506,8 @@ class EntryWebViewManager(private val context: Context) {
                         return toAbs(path);
                     }
 
-                    const result = await normalizeUploadUrl("$filename", "$kind");
-                    Android.onUrlNormalized(result);
+                    const result = await normalizeUploadUrl($serializedFilename, $serializedKind);
+                    Android.postMessage(JSON.stringify({ type: 'urlNormalized', url: result }));
                 })();
             """.trimIndent()
 
@@ -548,13 +585,13 @@ class EntryWebViewManager(private val context: Context) {
                             const path = match[0];
                             // 4. https://playentry.org + 경로
                             const fullUrl = 'https://playentry.org' + path;
-                            Android.onProfileImageExtracted(fullUrl);
+                            Android.postMessage(JSON.stringify({ type: 'profileImageExtracted', url: fullUrl }));
                             return;
                         }
                     }
 
                     // 프로필 이미지를 찾지 못한 경우
-                    Android.onProfileImageExtracted('');
+                    Android.postMessage(JSON.stringify({ type: 'profileImageExtracted', url: '' }));
                 })();
             """.trimIndent()
 
@@ -661,13 +698,13 @@ class EntryWebViewManager(private val context: Context) {
                             const path = match[0];
                             // 7. https://playentry.org와 결합
                             const fullUrl = 'https://playentry.org' + path;
-                            Android.onProfileImageExtracted(fullUrl);
+                            Android.postMessage(JSON.stringify({ type: 'profileImageExtracted', url: fullUrl }));
                             return;
                         }
                     }
 
                     // 프로필 이미지를 찾지 못한 경우
-                    Android.onProfileImageExtracted('');
+                    Android.postMessage(JSON.stringify({ type: 'profileImageExtracted', url: '' }));
                 })();
             """.trimIndent()
 
@@ -692,46 +729,6 @@ class EntryWebViewManager(private val context: Context) {
         webView = null
     }
     
-    // JavaScript Interface
-    private inner class JSInterface {
-        @JavascriptInterface
-        fun onLoginResult(success: String) {
-            jsLoginCallback?.invoke(success.toBoolean())
-        }
-
-        @JavascriptInterface
-        fun onTokensExtracted(csrf: String, xToken: String) {
-            prefManager.csrfToken = csrf
-            prefManager.xToken = xToken
-            Log.d(TAG, "토큰 저장 완료")
-        }
-
-        @JavascriptInterface
-        fun onNotificationsFetched(json: String) {
-            jsNotificationsCallback?.invoke(json)
-        }
-
-        @JavascriptInterface
-        fun onCommentPosted(success: String) {
-            jsCommentCallback?.invoke(success.toBoolean())
-        }
-
-        @JavascriptInterface
-        fun onCommentFound(json: String) {
-            jsFindCommentCallback?.invoke(json)
-        }
-
-        @JavascriptInterface
-        fun onUrlNormalized(url: String) {
-            jsUrlNormalizeCallback?.invoke(url)
-        }
-
-        @JavascriptInterface
-        fun onProfileImageExtracted(url: String) {
-            jsProfileImageCallback?.invoke(url)
-        }
-    }
-
     // Callbacks
     private var jsLoginCallback: ((Boolean) -> Unit)? = null
     private var jsNotificationsCallback: ((String) -> Unit)? = null

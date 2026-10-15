@@ -19,3 +19,16 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Public release builds must not retain diagnostic output. Besides reducing noise,
+# this prevents notification text, account names, URLs, and server responses from
+# reaching logcat through a missed debug statement.
+-assumenosideeffects class android.util.Log {
+    public static *** v(...);
+    public static *** d(...);
+    public static *** i(...);
+    public static *** w(...);
+    public static *** e(...);
+    public static *** wtf(...);
+    public static *** println(...);
+}
