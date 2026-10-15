@@ -90,7 +90,7 @@ object UserProfileFetcher {
 
         val graphqlResult = try {
             client.newCall(requestBuilder.build()).execute().use { response ->
-                val respStr = response.body?.string().orEmpty()
+                val respStr = SafeResponseReader.readText(response.body).orEmpty()
                 if (response.isSuccessful && respStr.isNotBlank()) {
                     val root = JSONObject(respStr)
                     val userstatus = root.optJSONObject("data")?.optJSONObject("userstatus")
@@ -146,7 +146,10 @@ object UserProfileFetcher {
                 .build()
             client.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) return null
-                val html = resp.body?.string().orEmpty()
+                val html = SafeResponseReader.readText(
+                    resp.body,
+                    SafeResponseReader.MAX_HTML_BYTES
+                ).orEmpty()
                 val match = Regex("<meta\\s+name=[\"']csrf-token[\"']\\s+content=[\"']([^\"']+)[\"']").find(html)
                     ?: Regex("[\"']csrfToken[\"']\\s*:\\s*[\"']([^\"']+)[\"']").find(html)
                 match?.groupValues?.get(1)?.trim()?.takeIf { it.isNotBlank() }
@@ -163,7 +166,10 @@ object UserProfileFetcher {
                 .build()
             client.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) return null
-                val html = resp.body?.string().orEmpty()
+                val html = SafeResponseReader.readText(
+                    resp.body,
+                    SafeResponseReader.MAX_HTML_BYTES
+                ).orEmpty()
                 if (html.isBlank()) return null
 
                 // 1) Next.js __NEXT_DATA__ 에서 닉네임 & 프로필 이미지 추출 시도
@@ -288,7 +294,7 @@ object UserProfileFetcher {
 
         try {
             client.newCall(requestBuilder.build()).execute().use { response ->
-                val respStr = response.body?.string().orEmpty()
+                val respStr = SafeResponseReader.readText(response.body).orEmpty()
                 if (!response.isSuccessful) {
                     Log.w(TAG, "fetchProject HTTP ${response.code} for $cleanId: ${respStr.take(200)}")
                     return@withContext null

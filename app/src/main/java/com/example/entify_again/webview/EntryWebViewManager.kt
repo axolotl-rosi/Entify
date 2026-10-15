@@ -2,7 +2,7 @@ package com.example.entify_again.webview
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.util.Log
+import com.example.entify_again.util.PrivacyLog as Log
 import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -10,7 +10,6 @@ import android.webkit.WebSettings
 import android.webkit.WebResourceRequest
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
-import com.example.entify_again.util.PreferenceManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -25,7 +24,7 @@ class EntryWebViewManager(private val context: Context) {
 
     private open inner class TrustedEntryWebViewClient : WebViewClient() {
         override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-            return !EntryOriginPolicy.isTrusted(request?.url?.toString())
+            return !EntryOriginPolicy.isTrustedMainHost(request?.url?.toString())
         }
     }
     
@@ -34,10 +33,10 @@ class EntryWebViewManager(private val context: Context) {
         private const val ENTRY_URL = "https://playentry.org"
         private const val GRAPHQL_URL = "https://playentry.org/graphql/SELECT_TOPICS"
         private const val COMMENTS_GRAPHQL_URL = "https://playentry.org/graphql/SELECT_COMMENTS"
+        private const val MAX_MESSAGE_CHARS = 1_048_576
     }
     
     private var webView: WebView? = null
-    private val prefManager = PreferenceManager(context)
     
     /**
      * WebView 초기화
@@ -45,6 +44,7 @@ class EntryWebViewManager(private val context: Context) {
     @SuppressLint("SetJavaScriptEnabled")
     fun initWebView(): WebView {
         return WebView(context).apply {
+            filterTouchesWhenObscured = true
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             settings.databaseEnabled = true
@@ -52,6 +52,13 @@ class EntryWebViewManager(private val context: Context) {
             settings.allowFileAccess = false
             settings.allowContentAccess = false
             settings.setGeolocationEnabled(false)
+            settings.javaScriptCanOpenWindowsAutomatically = false
+            settings.setSupportMultipleWindows(false)
+            settings.mediaPlaybackRequiresUserGesture = true
+            settings.saveFormData = false
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                settings.safeBrowsingEnabled = true
+            }
             CookieManager.getInstance().setAcceptThirdPartyCookies(this, false)
             // 데스크톱 User-Agent로 고정 (Chrome on Windows)
             settings.userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -73,12 +80,16 @@ class EntryWebViewManager(private val context: Context) {
         WebViewCompat.addWebMessageListener(
             target,
             "Android",
-            setOf("https://playentry.org", "https://*.playentry.org")
-        ) { _, message, sourceOrigin, isMainFrame, _ ->
-            if (!isMainFrame || !EntryOriginPolicy.isTrusted(sourceOrigin.toString())) {
+            setOf("https://playentry.org")
+        ) { view, message, sourceOrigin, isMainFrame, _ ->
+            if (!isMainFrame ||
+                !EntryOriginPolicy.isTrustedMainHost(sourceOrigin.toString()) ||
+                !EntryOriginPolicy.isTrustedMainHost(view.url)
+            ) {
                 return@addWebMessageListener
             }
             val payload = message.data ?: return@addWebMessageListener
+            if (payload.length > MAX_MESSAGE_CHARS) return@addWebMessageListener
             handleTrustedBridgeMessage(payload)
         }
     }
@@ -86,103 +97,11 @@ class EntryWebViewManager(private val context: Context) {
     private fun handleTrustedBridgeMessage(raw: String) {
         val message = runCatching { JSONObject(raw) }.getOrNull() ?: return
         when (message.optString("type")) {
-            "loginResult" -> jsLoginCallback?.invoke(message.optBoolean("success"))
-            "tokensExtracted" -> {
-                prefManager.csrfToken = message.optString("csrf")
-                prefManager.xToken = message.optString("xToken")
-            }
             "notificationsFetched" -> jsNotificationsCallback?.invoke(message.optString("payload"))
-            "commentPosted" -> jsCommentCallback?.invoke(message.optBoolean("success"))
             "commentFound" -> jsFindCommentCallback?.invoke(message.optString("payload"))
             "urlNormalized" -> jsUrlNormalizeCallback?.invoke(message.optString("url"))
             "profileImageExtracted" -> jsProfileImageCallback?.invoke(message.optString("url"))
         }
-    }
-    
-    /**
-     * 엔트리 로그인
-     */
-    suspend fun login(username: String, password: String): Boolean = withContext(Dispatchers.Main) {
-        return@withContext suspendCancellableCoroutine { continuation ->
-            val web = webView ?: initWebView()
-            val serializedUsername = JSONObject.quote(username)
-            val serializedPassword = JSONObject.quote(password)
-            
-            web.webViewClient = object : TrustedEntryWebViewClient() {
-                override fun onPageFinished(view: WebView?, url: String?) {
-                    super.onPageFinished(view, url)
-                    
-                    // 로그인 스크립트 실행
-                    val loginScript = """
-                        (function() {
-                            const usernameInput = document.querySelector('input[name="username"]') || 
-                                                 document.querySelector('input[type="text"]');
-                            const passwordInput = document.querySelector('input[name="password"]') || 
-                                                 document.querySelector('input[type="password"]');
-                            const loginBtn = document.querySelector('button[type="submit"]') ||
-                                           document.querySelector('.login-button');
-                            
-                            if (usernameInput && passwordInput && loginBtn) {
-                                usernameInput.value = $serializedUsername;
-                                passwordInput.value = $serializedPassword;
-                                
-                                // 이벤트 트리거
-                                usernameInput.dispatchEvent(new Event('input', { bubbles: true }));
-                                passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
-                                
-                                setTimeout(() => {
-                                    loginBtn.click();
-                                    
-                                    // 로그인 성공 확인
-                                    setTimeout(() => {
-                                        const isLoggedIn = !window.location.href.includes('/login');
-                                        Android.postMessage(JSON.stringify({ type: 'loginResult', success: isLoggedIn }));
-                                    }, 2000);
-                                }, 500);
-                            } else {
-                                Android.postMessage(JSON.stringify({ type: 'loginResult', success: false }));
-                            }
-                        })();
-                    """.trimIndent()
-                    
-                    view?.evaluateJavascript(loginScript, null)
-                }
-            }
-            
-            // JavaScript Interface로 결과 받기
-            jsLoginCallback = { success ->
-                if (success) {
-                    // 쿠키 및 토큰 저장
-                    saveCookiesAndTokens(web)
-                    prefManager.isLoggedIn = true
-                    prefManager.username = username
-                }
-                continuation.resume(success)
-            }
-            
-            web.loadUrl("$ENTRY_URL/login")
-        }
-    }
-    
-    /**
-     * 쿠키와 토큰 저장
-     */
-    private fun saveCookiesAndTokens(webView: WebView) {
-        // 쿠키 저장
-        val cookieManager = CookieManager.getInstance()
-        val cookies = cookieManager.getCookie(ENTRY_URL)
-        prefManager.cookies = cookies
-        
-        // CSRF 토큰과 X-Token 추출
-        val tokenScript = """
-            (function() {
-                const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
-                const xToken = localStorage.getItem('playentry_token') || '';
-                Android.postMessage(JSON.stringify({ type: 'tokensExtracted', csrf, xToken }));
-            })();
-        """.trimIndent()
-        
-        webView.evaluateJavascript(tokenScript, null)
     }
     
     /**
@@ -730,9 +649,7 @@ class EntryWebViewManager(private val context: Context) {
     }
     
     // Callbacks
-    private var jsLoginCallback: ((Boolean) -> Unit)? = null
     private var jsNotificationsCallback: ((String) -> Unit)? = null
-    private var jsCommentCallback: ((Boolean) -> Unit)? = null
     private var jsFindCommentCallback: ((String) -> Unit)? = null
     private var jsUrlNormalizeCallback: ((String) -> Unit)? = null
     private var jsProfileImageCallback: ((String) -> Unit)? = null

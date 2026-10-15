@@ -124,4 +124,19 @@ interface NotificationDao {
 
     @Query("SELECT id FROM notification_archive WHERE category = :category AND actor = :actor AND ABS(createdAt - :createdAt) < 60000 LIMIT 1")
     suspend fun findDuplicateArchiveId(category: String, actor: String, createdAt: Long): Long?
+
+    @Query("SELECT * FROM notifications")
+    suspend fun getAllRawForEncryption(): List<NotificationEntity>
+
+    @Query("SELECT * FROM notification_archive")
+    suspend fun getAllArchiveRawForEncryption(): List<NotificationArchiveEntity>
+
+    @Query("UPDATE notifications SET title = :title, body = :body WHERE id = :id")
+    suspend fun updateEncryptedFields(id: Long, title: String, body: String)
+
+    @Query("UPDATE notification_archive SET title = :title, body = :body, rawPayload = :rawPayload WHERE id = :id")
+    suspend fun updateArchiveEncryptedFields(id: Long, title: String, body: String, rawPayload: String?)
+
+    @Query("UPDATE notification_archive SET rawPayload = :rawPayload WHERE topicId = :topicId")
+    suspend fun updateArchiveRawPayload(topicId: String, rawPayload: String)
 }

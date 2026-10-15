@@ -26,6 +26,10 @@ import com.example.entify_again.util.EntryTemplateFormatter
 import com.example.entify_again.util.NotificationSemantics
 import com.example.entify_again.util.UserProfileFetcher
 import com.example.entify_again.util.SecurityUtil
+import com.example.entify_again.util.SafeImageDecoder
+import com.example.entify_again.util.SafeResponseReader
+import com.example.entify_again.util.SecurityDiagnostics
+import com.example.entify_again.webview.EntryOriginPolicy
 import com.example.entify_again.service.EntryPollingForegroundService
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
@@ -79,6 +83,8 @@ import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
 import android.text.TextPaint
 import androidx.lifecycle.lifecycleScope
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
@@ -110,12 +116,75 @@ import kotlin.coroutines.resume
 
 class MainActivity : ComponentActivity() {
 
+    private fun buildLockScreenPlaceholder(channelId: String, smallIcon: Int): android.app.Notification =
+        NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(smallIcon)
+            .setContentTitle("새 Entify 알림")
+            .setContentText("잠금을 해제하여 알림 내용을 확인하세요.")
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .build()
+
+    private open inner class SecureEntryWebViewClient : WebViewClient() {
+        override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+            val url = request?.url?.toString()
+            return !EntryOriginPolicy.isAboutBlank(url) && !EntryOriginPolicy.isTrusted(url)
+        }
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun hardenSessionWebView(target: WebView) {
+        target.filterTouchesWhenObscured = true
+        target.settings.apply {
+            mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+            allowFileAccess = false
+            allowContentAccess = false
+            setGeolocationEnabled(false)
+            javaScriptCanOpenWindowsAutomatically = false
+            setSupportMultipleWindows(false)
+            mediaPlaybackRequiresUserGesture = true
+            saveFormData = false
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                safeBrowsingEnabled = true
+            }
+        }
+        CookieManager.getInstance().setAcceptThirdPartyCookies(target, false)
+    }
+
+    private fun installEntryMessageListener(
+        target: WebView,
+        javaScriptObjectName: String,
+        source: String,
+        isAllowedTopLevelUrl: (String?) -> Boolean,
+        onMessage: (String) -> Unit
+    ) {
+        check(WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+            "A current Android System WebView is required for secure page messaging."
+        }
+        WebViewCompat.addWebMessageListener(
+            target,
+            javaScriptObjectName,
+            setOf("https://playentry.org", "https://space.playentry.org")
+        ) { view, message, sourceOrigin, isMainFrame, _ ->
+            if (!isMainFrame || logoutInProgress) return@addWebMessageListener
+            if (!EntryOriginPolicy.isTrusted(sourceOrigin.toString())) return@addWebMessageListener
+            if (!isAllowedTopLevelUrl(view.url)) return@addWebMessageListener
+            val payload = message.data ?: return@addWebMessageListener
+            if (payload.length > MAX_WEB_MESSAGE_CHARS) {
+                AndroidLog.w("WEB_MESSAGE", "Rejected oversized message from $source")
+                return@addWebMessageListener
+            }
+            runOnUiThread {
+                if (!logoutInProgress && isAllowedTopLevelUrl(view.url)) {
+                    onMessage(payload)
+                }
+            }
+        }
+    }
+
     private fun isTrustedEntryNavigation(uri: Uri?): Boolean {
         if (uri == null) return false
-        if (uri.toString() == "about:blank") return true
-        if (!uri.scheme.equals("https", ignoreCase = true)) return false
-        val host = uri.host?.lowercase(java.util.Locale.ROOT) ?: return false
-        return host == "playentry.org" || host.endsWith(".playentry.org")
+        val url = uri.toString()
+        return EntryOriginPolicy.isAboutBlank(url) || EntryOriginPolicy.isTrusted(url)
     }
 
     private fun renderProcessCrashState(detail: RenderProcessGoneDetail?): Boolean? =
@@ -126,6 +195,7 @@ class MainActivity : ComponentActivity() {
     private val notificationRepository by lazy { NotificationRepository(this) }
     private var startupToastShown = false
     companion object {
+        private const val MAX_WEB_MESSAGE_CHARS = 1_048_576
         @Volatile
         var isAppInForeground: Boolean = false
     }
@@ -220,6 +290,8 @@ class MainActivity : ComponentActivity() {
     private var tokenBootstrapPending = false
     private var lastLoginRedirectAt = 0L
     private var lastTriggerToastAt = 0L
+    @Volatile private var logoutInProgress = false
+    private var webViewGeneration by mutableIntStateOf(0)
 
     private fun postDebugTriggerNotification() {
         val key = "TEST_TRIGGER"
@@ -269,7 +341,9 @@ class MainActivity : ComponentActivity() {
                     .addHeader("x-client-type", "Client")
                     .post(body)
                     .build()
-                val respText = client.newCall(request).execute().use { it.body?.string().orEmpty() }
+                val respText = client.newCall(request).execute().use {
+                    SafeResponseReader.readText(it.body).orEmpty()
+                }
                 val listLen = runCatching {
                     val root = JSONObject(respText)
                     root.optJSONObject("data")?.optJSONObject("topicList")?.optJSONArray("list")?.length() ?: 0
@@ -649,7 +723,7 @@ class MainActivity : ComponentActivity() {
             var respText = withContext(Dispatchers.IO) {
                 client.newCall(buildRequest(xToken, csrfToken)).execute().use { resp ->
                     respCode = resp.code
-                    resp.body?.string().orEmpty()
+                    SafeResponseReader.readText(resp.body).orEmpty()
                 }
             }
             // ✅ 403(토큰 만료)이면 토큰을 갱신한 뒤 "이번 시도 안에서" 즉시 한 번 재시도한다.
@@ -667,7 +741,7 @@ class MainActivity : ComponentActivity() {
                         respText = withContext(Dispatchers.IO) {
                             client.newCall(buildRequest(xToken, csrfToken)).execute().use { resp ->
                                 respCode = resp.code
-                                resp.body?.string().orEmpty()
+                                SafeResponseReader.readText(resp.body).orEmpty()
                             }
                         }
                     }
@@ -1294,7 +1368,7 @@ class MainActivity : ComponentActivity() {
     private fun logGraphqlIntercept(source: String, request: WebResourceRequest?) {
         if (request == null) return
         val url = request.url?.toString() ?: return
-        if (!url.startsWith("https://playentry.org/graphql")) return
+        if (!EntryOriginPolicy.isTrustedPath(url, "playentry.org", "/graphql")) return
         val headers = request.requestHeaders ?: emptyMap()
         val interestingKeys = listOf(
             "Referer",
@@ -1584,7 +1658,7 @@ class MainActivity : ComponentActivity() {
         }
         
         // 숨김 WebView 설정
-        hiddenWebView?.webViewClient = object : WebViewClient() {
+        hiddenWebView?.webViewClient = object : SecureEntryWebViewClient() {
             override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
                 AndroidLog.e("HIDDEN_WEBVIEW", "Render process gone: didCrash=${renderProcessCrashState(detail)}")
                 return true
@@ -1592,9 +1666,9 @@ class MainActivity : ComponentActivity() {
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
-                val isEntryPage = url?.startsWith("https://playentry.org/") == true ||
-                    url?.startsWith("https://space.playentry.org/") == true
-                val isSigninPage = url?.contains("/signin") == true
+                val isEntryPage = EntryOriginPolicy.isTrustedHost(url, "playentry.org") ||
+                    EntryOriginPolicy.isTrustedHost(url, "space.playentry.org")
+                val isSigninPage = EntryOriginPolicy.isTrustedPath(url, "playentry.org", "/signin")
                 if (isEntryPage && !isSigninPage) {
                     AndroidLog.d("HIDDEN_WEBVIEW", "Hidden page finished: $url")
 
@@ -2000,9 +2074,10 @@ class MainActivity : ComponentActivity() {
         val normalizedTarget = normalizeEntryUrl(targetPageUrl).orEmpty()
         val currentBase = normalizedCurrent.substringBefore('?').substringBefore('#')
         val targetBase = normalizedTarget.substringBefore('?').substringBefore('#')
-        val isEntryContentPage = (normalizedCurrent.startsWith("https://playentry.org/") ||
-            normalizedCurrent.startsWith("https://space.playentry.org/")) &&
-            !normalizedCurrent.contains("/signin")
+        val isEntryContentPage = (
+            EntryOriginPolicy.isTrustedHost(normalizedCurrent, "playentry.org") ||
+                EntryOriginPolicy.isTrustedHost(normalizedCurrent, "space.playentry.org")
+            ) && !EntryOriginPolicy.isTrustedPath(normalizedCurrent, "playentry.org", "/signin")
         val targetIdValid = HEX_OBJECT_ID.matches(targetId)
         val sameTargetPage = currentBase.isNotBlank() && targetBase.isNotBlank() &&
             currentBase.equals(targetBase, ignoreCase = true)
@@ -2267,6 +2342,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            window.setHideOverlayWindows(true)
+        }
         val prevHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             AndroidLog.e("FATAL_CRASH", "Uncaught exception in ${thread.name}: ${throwable.message}", throwable)
@@ -2278,6 +2356,14 @@ class MainActivity : ComponentActivity() {
 
         // PreferenceManager 초기화
         preferenceManager = PreferenceManager(this)
+        val securityStatus = SecurityDiagnostics.checkStatus(this)
+        if (securityStatus.isPotentiallyCompromised) {
+            Toast.makeText(
+                this,
+                "기기 보안 상태 확인을 권장합니다. Entify 기능은 차단하지 않습니다.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
         if (!preferenceManager.rememberNotifications) {
             preferenceManager.clearNotificationMemory(bumpGeneration = false)
         }
@@ -2326,6 +2412,7 @@ class MainActivity : ComponentActivity() {
                             .fillMaxSize()
                     ) {
                         // ✅ 원본 WebView — 항상 존재, 로그인 후에는 숨김
+                        key(webViewGeneration) {
                         AndroidView(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -2418,7 +2505,8 @@ class MainActivity : ComponentActivity() {
                                         }
                                     }
 
-                                    webViewClient = object : WebViewClient() {
+                                    hardenSessionWebView(this)
+                                    webViewClient = object : SecureEntryWebViewClient() {
                                         override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
                                             AndroidLog.e("MAIN_WEBVIEW", "Render process gone: didCrash=${renderProcessCrashState(detail)}")
                                             return true
@@ -2447,7 +2535,7 @@ class MainActivity : ComponentActivity() {
 
                                             // ✅ 로그인 페이지 → 메인 페이지 전환 감지 (수동 로그인 성공)
                                             val wasSigninPage = previousUrl?.contains("/signin") == true
-                                            val isNowMainPage = url == "https://playentry.org/" || url == "https://playentry.org" || url?.startsWith("https://playentry.org/?") == true
+                                            val isNowMainPage = EntryOriginPolicy.isTrustedPath(url, "playentry.org", "/")
 
                                             if (wasSigninPage && isNowMainPage) {
                                                 AndroidLog.d("LOGIN_TRANSITION", "🎉 로그인 페이지 → 메인 페이지 전환 감지! 즉시 토큰 추출 시작")
@@ -2678,7 +2766,7 @@ class MainActivity : ComponentActivity() {
                                             }, 250) // ✅ 지연 최소화: 렌더링 안정성과 시작 속도 균형
 
                                             // ✅ 메인(홈) 판별: 정확히 루트(쿼리 포함 가능)
-                                            val isMain = url == "https://playentry.org/" || url == "https://playentry.org" || (url?.startsWith("https://playentry.org/?") == true)
+                                            val isMain = EntryOriginPolicy.isTrustedPath(url, "playentry.org", "/")
                                             val isNotificationPage = url?.contains("/notification") == true || url?.contains("/notifications") == true
                                             val isProfilePage = url?.contains("/profile/") == true
                                             val isCommunityUser = url?.contains("/community/user/") == true
@@ -2769,8 +2857,8 @@ class MainActivity : ComponentActivity() {
 
                                             // 작품/커뮤니티 페이지에서 댓글 매핑/추출 스크립트 주입
                                             val isProjectOrCommunity =
-                                                (url?.startsWith("https://playentry.org/project/") == true) ||
-                                                        (url?.startsWith("https://playentry.org/community/") == true)
+                                                EntryOriginPolicy.isTrustedPath(url, "playentry.org", "/project") ||
+                                                        EntryOriginPolicy.isTrustedPath(url, "playentry.org", "/community")
                                             if (isProjectOrCommunity) {
                                                 if (!DRY_RUN_NOTIF_ONLY) {
                                                     view?.evaluateJavascript(jsCommentMapping, null)
@@ -2884,7 +2972,12 @@ class MainActivity : ComponentActivity() {
                                         // 로그인 후 메인으로 복귀 시 처리 로직은 onPageFinished 내부 상단에서 수행됩니다.
                                     }
 
-                                    addJavascriptInterface(WebAppInterface { msg ->
+                                    installEntryMessageListener(
+                                        this,
+                                        "AndroidApp",
+                                        "MAIN",
+                                        EntryOriginPolicy::isTrustedMainHost
+                                    ) { msg ->
                                         runOnUiThread {
                                             onJsMessage(msg, "MAIN")
                                             status = msg
@@ -2945,8 +3038,8 @@ class MainActivity : ComponentActivity() {
                                                 // 메인으로 즉시 이동 → onPageFinished에서 3초 후 jsFetchCommentNotifications 호출
                                                 try {
                                                     val wv = mainWebView
-                                                    if (wv?.url?.startsWith("https://playentry.org/signin") == true) {
-                                                        wv.loadUrl("https://playentry.org/")
+                                                    if (EntryOriginPolicy.isTrustedPath(wv?.url, "playentry.org", "/signin")) {
+                                                        wv?.loadUrl("https://playentry.org/")
                                                     }
                                                 } catch (_: Exception) {}
                                             }
@@ -3354,6 +3447,8 @@ class MainActivity : ComponentActivity() {
                                                             )
 
                                                             val builder = NotificationCompat.Builder(this@MainActivity, commentChannelId)
+                                                                .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                                                                .setPublicVersion(buildLockScreenPlaceholder(commentChannelId, android.R.drawable.ic_dialog_info))
                                                                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                                                                 .setContentTitle("$user 님의 댓글")
                                                                 .setContentText(text.take(80))
@@ -3419,6 +3514,8 @@ class MainActivity : ComponentActivity() {
                                                     )
 
                                                     val builder = NotificationCompat.Builder(this@MainActivity, commentChannelId)
+                                                        .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                                                        .setPublicVersion(buildLockScreenPlaceholder(commentChannelId, android.R.drawable.ic_dialog_info))
                                                         .setSmallIcon(android.R.drawable.ic_dialog_info)
                                                         .setContentTitle("$user 님이 댓글을 남겼어요")
                                                         .setContentText(text.take(80))
@@ -3641,7 +3738,7 @@ class MainActivity : ComponentActivity() {
                                                 }
                                             }
                                         }
-                                    }, "AndroidApp")
+                                    }
 
                                     // ✅ 토큰 보유 여부에 따라 초기 진입 페이지 결정
                                     val initialUrl = if (hasStoredTokens()) {
@@ -3662,6 +3759,7 @@ class MainActivity : ComponentActivity() {
                                 webView
                             }
                         )
+                        }
 
                         // ✅ 로그인 후 덮개 (터치 차단)
                         if (overlayVisible) {
@@ -3683,23 +3781,9 @@ class MainActivity : ComponentActivity() {
                                 com.example.entify_again.ui.navigation.EntifyMainScreen(
                                     context = this@MainActivity,
                                     onLogout = {
-                                        // 폴링 서비스 중지
-                                        EntryPollingForegroundService.stop(this@MainActivity)
-                                        // 토큰 삭제 (화면 전환 없이)
-                                        preferenceManager.logoutPending = true
-                                        preferenceManager.isLoggedIn = false
-                                        preferenceManager.xToken = null
-                                        preferenceManager.csrfToken = null
-                                        preferenceManager.cookies = null
-                                        // WebView 쿠키도 삭제
-                                        CookieManager.getInstance().removeAllCookies(null)
-                                        CookieManager.getInstance().flush()
-                                        // WebView를 로그인 페이지로 미리 로드 (로그인 버튼 누를 때 바로 보이도록)
-                                        mainWebView?.post {
-                                            mainWebView?.loadUrl("https://playentry.org/signin")
+                                        performSecureLogout("user_request") {
+                                            isLoggedIn = false
                                         }
-                                        // ❌ isLoggedIn = false 하지 않음 → 화면 전환 안 함
-                                        // 사용자가 설정에서 "로그인" 버튼을 눌러야 WebView 로그인 화면으로 전환
                                     },
                                     onNavigateToLogin = {
                                         // 사용자가 수동으로 로그인 화면으로 이동 요청
@@ -3712,13 +3796,14 @@ class MainActivity : ComponentActivity() {
                 }
 
                 // 로그인 상태 감지 (SharedPrefs 폴링)
-                // ✅ 로그인 성공 감지만 함 (false→true). 로그아웃(true→false)은 수동으로만.
                 LaunchedEffect(Unit) {
                     while (true) {
                         kotlinx.coroutines.delay(1000)
                         val loggedIn = preferenceManager.isLoggedIn
                         if (loggedIn && !isLoggedIn) {
                             isLoggedIn = true
+                        } else if (!loggedIn && isLoggedIn && !logoutInProgress) {
+                            isLoggedIn = false
                         }
                     }
                 }
@@ -4339,7 +4424,8 @@ class MainActivity : ComponentActivity() {
             while (true) {
                 val ready = withContext(Dispatchers.Main) {
                     val url = mainWebView?.url.orEmpty()
-                    url.startsWith("https://playentry.org") && !url.contains("/signin")
+                    EntryOriginPolicy.isTrustedMainHost(url) &&
+                        !EntryOriginPolicy.isTrustedPath(url, "playentry.org", "/signin")
                 }
                 if (ready) return@withTimeoutOrNull true
                 delay(200)
@@ -5436,15 +5522,6 @@ class MainActivity : ComponentActivity() {
         })();
     """.trimIndent()
 
-    // ✅ JS ↔ Android 인터페이스
-    @Suppress("unused")
-    class WebAppInterface(private val callback: (String) -> Unit) {
-        @JavascriptInterface
-        fun postMessage(message: String) {
-            callback(message)
-        }
-    }
-
     private fun ensureNotificationSetup() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = getSystemService(NotificationManager::class.java)
@@ -5642,6 +5719,8 @@ class MainActivity : ComponentActivity() {
         )
 
         val builder = NotificationCompat.Builder(this, commentChannelId)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(buildLockScreenPlaceholder(commentChannelId, android.R.drawable.ic_dialog_info))
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle("알림")
             .setContentText(safeBody)
@@ -5743,7 +5822,7 @@ class MainActivity : ComponentActivity() {
 
     private fun isSpaceNotificationUrl(url: String?): Boolean {
         val normalized = sanitizeEntryUrlOrNull(url) ?: return false
-        return normalized.contains("space.playentry.org/", ignoreCase = true)
+        return EntryOriginPolicy.isTrustedHost(normalized, "space.playentry.org")
     }
 
     private fun isNonInteractiveNotification(key: String?, url: String?): Boolean {
@@ -5797,8 +5876,8 @@ class MainActivity : ComponentActivity() {
                         isBlocked = isBlocked,
                         createdAt = createdAt
                     )
-                notificationRepository.insertIfNew(entity)
-                notificationRepository.archiveIfNew(entity.asArchive(rawPayload))
+                val safePayload = com.example.entify_again.util.PayloadSanitizer.sanitize(rawPayload)
+                notificationRepository.insertIfNew(entity, safePayload)
                 if (!resolvedActorImage.isNullOrBlank()) {
                     notificationRepository.updateActorImage(entityTopicId, actor, resolvedActorImage)
                     notificationRepository.updateArchiveActorImage(entityTopicId, resolvedActorImage)
@@ -5891,6 +5970,8 @@ class MainActivity : ComponentActivity() {
             .addMessage(content.ifBlank { "(내용 없음)" }, System.currentTimeMillis(), person)
 
         val builder = NotificationCompat.Builder(this, commentChannelId)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(buildLockScreenPlaceholder(commentChannelId, android.R.drawable.ic_dialog_info))
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setStyle(style)
             .setLargeIcon(iconBmp)
@@ -5947,6 +6028,8 @@ class MainActivity : ComponentActivity() {
         )
 
         val builder = NotificationCompat.Builder(this, commentChannelId)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(buildLockScreenPlaceholder(commentChannelId, android.R.drawable.ic_dialog_info))
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle("알림")
             .setContentText(safeBody)
@@ -6012,7 +6095,8 @@ class MainActivity : ComponentActivity() {
             }
 
             override fun onResponse(call: Call, response: Response) {
-                val bodyText = response.body?.string() ?: return callback("⚠️ 빈 응답")
+                val bodyText = SafeResponseReader.readText(response.body)
+                    ?: return callback("⚠️ 응답이 비어 있거나 안전 한도를 초과했습니다")
                 try {
                     val list = JSONObject(bodyText)
                         .getJSONObject("data")
@@ -6104,12 +6188,27 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
         isAppForeground = false
         isAppInForeground = false
         EntryPollingForegroundService.setMainAppForeground(this, false)
         stopAlarmBackgroundPoller("on_destroy")
-        mainWebView?.post { mainWebView?.evaluateJavascript("if (window.__ENTRY_POLLER__){ __ENTRY_POLLER__.stop(); delete window.__ENTRY_POLLER__; }", null) }
+        listOfNotNull(
+            mainWebView,
+            hiddenWebView,
+            alarmWebView,
+            tokenWebView,
+            followGraphqlWebView,
+            shareGraphqlWebView,
+            profileWebView
+        ).distinct().forEach(::destroySessionWebView)
+        mainWebView = null
+        hiddenWebView = null
+        alarmWebView = null
+        tokenWebView = null
+        followGraphqlWebView = null
+        shareGraphqlWebView = null
+        profileWebView = null
+        super.onDestroy()
     }
 
     @Composable
@@ -6193,7 +6292,7 @@ class MainActivity : ComponentActivity() {
                     val isSvg = mime.contains("svg") || normalized.lowercase().endsWith(".svg")
 
                     if (isSvg) {
-                        val svgBytes = resp.body?.bytes() ?: return@use null
+                        val svgBytes = resp.body?.let { SafeImageDecoder.readBounded(it) } ?: return@use null
                         if (!looksLikeSvg(svgBytes)) return@use null
                         val b64 = android.util.Base64.encodeToString(svgBytes, android.util.Base64.NO_WRAP)
                         return@use withContext(Dispatchers.Main) {
@@ -6239,7 +6338,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     } else {
-                        val bytes = resp.body?.bytes()
+                        val bytes = resp.body?.let { SafeImageDecoder.readBounded(it) }
                         if (bytes == null || !looksLikeRasterImage(bytes)) return@use null
                         val decoded = bytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
                         if (decoded != null) {
@@ -6376,18 +6475,19 @@ class MainActivity : ComponentActivity() {
         return try {
             client.newCall(request).execute().use { resp ->
                 if (!resp.isSuccessful) return null
-                val bodyBytes = resp.body?.bytes() ?: return null
+                val bodyBytes = resp.body?.let { SafeImageDecoder.readBounded(it) } ?: return null
                 val contentType = resp.header("content-type").orEmpty()
                 if (contentType.isNotBlank() && !isAllowedImageMime(contentType)) return null
                 val isSvg = safeUrl.contains(".svg", true) ||
                         contentType.contains("svg", true) ||
                         looksLikeSvg(bodyBytes)
                 val decoded = if (isSvg) {
+                    if (!SafeImageDecoder.isSafeSvg(bodyBytes)) return null
                     renderSvgToBitmap(bodyBytes, targetSize, targetSize)
                         ?: renderSvgWithWebView(String(bodyBytes, Charsets.UTF_8), targetSize)
                 } else {
                     if (!looksLikeRasterImage(bodyBytes)) return null
-                    BitmapFactory.decodeByteArray(bodyBytes, 0, bodyBytes.size)
+                    SafeImageDecoder.decodeRaster(bodyBytes, targetSize)
                 }
                 decoded
             }
@@ -6575,7 +6675,12 @@ class MainActivity : ComponentActivity() {
 
     private fun isAllowedEntryHost(hostRaw: String?): Boolean {
         val host = hostRaw?.trim()?.lowercase(Locale.ROOT).orEmpty()
-        return host == "playentry.org" || host.endsWith(".playentry.org") || host.endsWith(".pstatic.net")
+        return host == "playentry.org" || host.endsWith(".playentry.org")
+    }
+
+    private fun isAllowedImageHost(hostRaw: String?): Boolean {
+        val host = hostRaw?.trim()?.lowercase(Locale.ROOT).orEmpty()
+        return isAllowedEntryHost(host) || host == "pstatic.net" || host.endsWith(".pstatic.net")
     }
 
     private fun sanitizeEntryUrlOrNull(rawUrl: String?): String? {
@@ -6652,7 +6757,7 @@ class MainActivity : ComponentActivity() {
         val uri = runCatching { Uri.parse(normalized) }.getOrNull() ?: return ""
         val scheme = uri.scheme?.lowercase(Locale.ROOT).orEmpty()
         if (scheme != "https") return ""
-        if (!isAllowedEntryHost(uri.host)) return ""
+        if (!isAllowedImageHost(uri.host)) return ""
         val path = uri.path.orEmpty()
         if (!isLikelyImagePath(path)) return ""
         return normalized
@@ -6684,7 +6789,7 @@ class MainActivity : ComponentActivity() {
             val safe = sanitizeImageUrl(url)
             if (safe.isBlank()) return ""
             val u = Uri.parse(safe)
-            val hostOk = (u.host ?: "").contains("playentry.org", ignoreCase = true)
+            val hostOk = EntryOriginPolicy.isTrusted(u.toString())
             val path = u.path ?: ""
             if (!hostOk || !path.contains("/uploads/")) return safe
             val last = path.substringAfterLast('/')
@@ -7322,7 +7427,7 @@ class MainActivity : ComponentActivity() {
                     AndroidLog.w(logTag, "Project meta GraphQL HTTP ${response.code} (projectId=$projectId)")
                     return@use null
                 }
-                val responseBody = response.body?.string().orEmpty()
+                val responseBody = SafeResponseReader.readText(response.body).orEmpty()
                 if (responseBody.isBlank()) return@use null
 
                 val root = JSONObject(responseBody)
@@ -8304,23 +8409,109 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun handleLogoutDetected(reason: String) {
-        if (preferenceManager.logoutPending) return
-        AndroidLog.w("LOGOUT", "Logout detected ($reason)")
+    /**
+     * Invalidates every in-process session surface before presenting a fresh
+     * login WebView. Notification history and non-session user settings are
+     * deliberately retained.
+     */
+    private fun performSecureLogout(reason: String, onComplete: (() -> Unit)? = null) {
+        if (logoutInProgress) return
+        logoutInProgress = true
+        AndroidLog.w("LOGOUT", "Secure logout started ($reason)")
+
         preferenceManager.logoutPending = true
         preferenceManager.isLoggedIn = false
-        preferenceManager.xToken = null
-        preferenceManager.csrfToken = null
-        preferenceManager.cookies = null
-        markTokensStale()
-
-        // 서비스 중지
+        preferenceManager.clearSessionSecrets()
+        preferenceManager.username = null
+        preferenceManager.profileImageUrl = null
+        preferenceManager.commentUserId = null
         EntryPollingForegroundService.stop(this)
 
-        // WebView를 로그인 페이지로 미리 로드 (사용자가 로그인 버튼 누를 때 바로 보이도록)
-        mainWebView?.post {
-            mainWebView?.loadUrl("https://playentry.org/signin")
+        startupFlowJob?.cancel()
+        startupFlowJob = null
+        stopAlarmBackgroundPoller("secure_logout:$reason")
+        alarmStartRunnable?.let(mainHandler::removeCallbacks)
+        alarmRecoveryRunnable?.let(mainHandler::removeCallbacks)
+        hiddenWebViewTimeout?.let(mainHandler::removeCallbacks)
+        alarmStartRunnable = null
+        alarmRecoveryRunnable = null
+        hiddenWebViewTimeout = null
+        pendingTokenReady?.cancel()
+        pendingTokenReady = null
+        pendingGraphqlTokenRequest?.cancel()
+        pendingGraphqlTokenRequest = null
+        tokenBootstrapDeferred?.cancel()
+        tokenBootstrapDeferred = null
+        followGraphqlPageDeferred?.cancel()
+        followGraphqlPageDeferred = null
+        shareGraphqlPageDeferred?.cancel()
+        shareGraphqlPageDeferred = null
+
+        val sessionWebViews = listOfNotNull(
+            mainWebView,
+            hiddenWebView,
+            alarmWebView,
+            tokenWebView,
+            followGraphqlWebView,
+            shareGraphqlWebView,
+            profileWebView
+        ).distinct()
+        mainWebView = null
+        hiddenWebView = null
+        alarmWebView = null
+        tokenWebView = null
+        followGraphqlWebView = null
+        shareGraphqlWebView = null
+        profileWebView = null
+        sessionWebViews.forEach(::destroySessionWebView)
+
+        webViewCookieGeneration.clear()
+        cookiesPrimedGlobally = false
+        avatarCache.evictAll()
+        notifAvatarUrl.clear()
+        followDeepLinks.clear()
+        followNickById.clear()
+        followProfileApplied.clear()
+        followInProgress.clear()
+        WebStorage.getInstance().deleteAllData()
+
+        val cookieManager = CookieManager.getInstance()
+        val finishLogout = Runnable {
+            if (!logoutInProgress) return@Runnable
+            logoutInProgress = false
+            webViewGeneration++
+            AndroidLog.d("LOGOUT", "Secure logout completed ($reason)")
+            onComplete?.invoke()
         }
+        cookieManager.removeAllCookies {
+            cookieManager.flush()
+            mainHandler.post {
+                finishLogout.run()
+            }
+        }
+    }
+
+    private fun destroySessionWebView(webView: WebView) {
+        runCatching { webView.stopLoading() }
+        runCatching {
+            webView.evaluateJavascript(
+                "if(window.__ENTRY_POLLER__){window.__ENTRY_POLLER__.stop();delete window.__ENTRY_POLLER__;}",
+                null
+            )
+        }
+        runCatching { webView.removeJavascriptInterface("AndroidApp") }
+        runCatching { webView.removeJavascriptInterface("ProfileBridge") }
+        runCatching { webView.clearHistory() }
+        runCatching { webView.clearCache(true) }
+        runCatching { webView.clearFormData() }
+        runCatching { webView.loadUrl("about:blank") }
+        runCatching { (webView.parent as? ViewGroup)?.removeView(webView) }
+        runCatching { webView.destroy() }
+    }
+
+    private fun handleLogoutDetected(reason: String) {
+        if (preferenceManager.logoutPending) return
+        performSecureLogout("detected:$reason")
 
         postSimpleNotification(
             key = "SYSTEM_LOGOUT",
@@ -8349,7 +8540,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun isMainContentUrl(url: String?): Boolean =
-        url?.startsWith("https://playentry.org") == true && url.contains("/signin") != true
+        EntryOriginPolicy.isTrustedMainHost(url) &&
+            !EntryOriginPolicy.isTrustedPath(url, "playentry.org", "/signin")
 
     private fun runTokenExtractorIfReady(reason: String = "manual") {
         val webView = mainWebView ?: run {
@@ -9916,7 +10108,8 @@ class MainActivity : ComponentActivity() {
             settings.cacheMode = WebSettings.LOAD_NO_CACHE
             settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
 
-            webViewClient = object : WebViewClient() {
+            hardenSessionWebView(this)
+            webViewClient = object : SecureEntryWebViewClient() {
                 override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
                     AndroidLog.e("PROFILE", "Render process gone: didCrash=${renderProcessCrashState(detail)}")
                     return true
@@ -9951,7 +10144,7 @@ class MainActivity : ComponentActivity() {
                         "FOLLOW" -> {
                             // ✅ template_27: "https://playentry.org/profile/" 필수
                             val expectedUserId = info.userId
-                            val valid = url?.startsWith("https://playentry.org/profile/") == true &&
+                            val valid = EntryOriginPolicy.isTrustedPath(url, "playentry.org", "/profile") &&
                                 (expectedUserId.isNullOrBlank() || url.contains("/profile/$expectedUserId"))
 
                             if (!valid) {
@@ -9964,7 +10157,7 @@ class MainActivity : ComponentActivity() {
                         "SHARE", shareDomFallbackType -> {
                             // ✅ template_28: "https://playentry.org/project/" 필수
                             val expectedProjectId = info.userId  // SHARE에서는 userId 필드에 projectId 저장
-                            val valid = url?.startsWith("https://playentry.org/project/") == true &&
+                            val valid = EntryOriginPolicy.isTrustedPath(url, "playentry.org", "/project") &&
                                 (expectedProjectId.isNullOrBlank() || url.contains("/project/$expectedProjectId"))
 
                             if (!valid) {
@@ -9974,7 +10167,7 @@ class MainActivity : ComponentActivity() {
                             }
                             valid
                         }
-                        else -> url?.startsWith("https://playentry.org/") == true
+                        else -> EntryOriginPolicy.isTrustedMainHost(url)
                     }
 
                     if (!isValidUrl) {
@@ -10055,15 +10248,14 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            addJavascriptInterface(object {
-                @JavascriptInterface
-                fun postMessage(message: String) {
-                    AndroidLog.d("PROFILE", "Bridge message: $message")
-                    runOnUiThread {
-                        handleProfileMessage(message)
-                    }
-                }
-            }, "ProfileBridge")
+            installEntryMessageListener(
+                this,
+                "ProfileBridge",
+                "PROFILE",
+                EntryOriginPolicy::isTrustedMainHost
+            ) { message ->
+                handleProfileMessage(message)
+            }
         }
 
         CookieManager.getInstance().apply {
@@ -10352,6 +10544,8 @@ class MainActivity : ComponentActivity() {
         )
 
         val builder = NotificationCompat.Builder(this, followChannelId)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(buildLockScreenPlaceholder(followChannelId, android.R.drawable.ic_menu_myplaces))
             .setSmallIcon(android.R.drawable.ic_menu_myplaces)  // 사람 아이콘
             .setContentTitle("팔로잉")  // ✅ 통일된 제목
             .setContentText("${displayName}님이 나를 팔로잉 했어요")  // ✅ 통일된 내용 형식
@@ -10397,8 +10591,9 @@ class MainActivity : ComponentActivity() {
                 setSupportZoom(false)
             }
 
+            hardenSessionWebView(this)
             // ✅ ② onPageFinished 이후에만 JS 주입하도록 수정
-            webViewClient = object : WebViewClient() {
+            webViewClient = object : SecureEntryWebViewClient() {
                 override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
                     AndroidLog.e("FOLLOW_EXTRACT", "Render process gone: didCrash=${renderProcessCrashState(detail)}")
                     return true
@@ -10423,14 +10618,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // 🔗 숨김 WebView도 메인과 "같은" 인터페이스 이름으로 공통 라우터 연결
-            addJavascriptInterface(object {
-                @JavascriptInterface
-                fun postMessage(msg: String) {
-                    AndroidLog.d("JS_BRIDGE", "[HIDDEN] event received")
-                    runOnUiThread { onJsMessage(msg, "HIDDEN") }
-                }
-            }, "AndroidApp")
+            installEntryMessageListener(this, "AndroidApp", "HIDDEN", { url ->
+                EntryOriginPolicy.isTrustedHost(url, "playentry.org") ||
+                    EntryOriginPolicy.isTrustedHost(url, "space.playentry.org")
+            }) { msg -> onJsMessage(msg, "HIDDEN") }
         }
 
         // 쿠키와 세션을 메인 WebView와 공유
@@ -10458,7 +10649,8 @@ class MainActivity : ComponentActivity() {
                 cacheMode = WebSettings.LOAD_NO_CACHE
                 loadsImagesAutomatically = false
             }
-            webViewClient = object : WebViewClient() {
+            hardenSessionWebView(this)
+            webViewClient = object : SecureEntryWebViewClient() {
                 override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
                     AndroidLog.e("FOLLOW_GRAPHQL", "Render process gone: didCrash=${renderProcessCrashState(detail)}")
                     return true
@@ -10517,13 +10709,9 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            addJavascriptInterface(object {
-                @JavascriptInterface
-                fun postMessage(message: String) {
-                    AndroidLog.d("JS_BRIDGE", "[FOLLOW] event received")
-                    runOnUiThread { onJsMessage(message, "FOLLOW") }
-                }
-            }, "AndroidApp")
+            installEntryMessageListener(this, "AndroidApp", "FOLLOW", { url ->
+                EntryOriginPolicy.isTrustedPath(url, "playentry.org", "/profile")
+            }) { message -> onJsMessage(message, "FOLLOW") }
         }
 
         CookieManager.getInstance().apply {
@@ -10561,7 +10749,8 @@ class MainActivity : ComponentActivity() {
                 cacheMode = WebSettings.LOAD_NO_CACHE
                 loadsImagesAutomatically = false
             }
-            webViewClient = object : WebViewClient() {
+            hardenSessionWebView(this)
+            webViewClient = object : SecureEntryWebViewClient() {
                 override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
                     AndroidLog.e("SHARE_GRAPHQL", "Render process gone: didCrash=${renderProcessCrashState(detail)}")
                     return true
@@ -10617,13 +10806,9 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            addJavascriptInterface(object {
-                @JavascriptInterface
-                fun postMessage(message: String) {
-                    AndroidLog.d("JS_BRIDGE", "[SHARE] event received")
-                    runOnUiThread { onJsMessage(message, "SHARE") }
-                }
-            }, "AndroidApp")
+            installEntryMessageListener(this, "AndroidApp", "SHARE", { url ->
+                EntryOriginPolicy.isTrustedPath(url, "playentry.org", "/project")
+            }) { message -> onJsMessage(message, "SHARE") }
         }
 
         CookieManager.getInstance().apply {
@@ -10660,7 +10845,8 @@ class MainActivity : ComponentActivity() {
             settings.cacheMode = WebSettings.LOAD_NO_CACHE
             settings.loadsImagesAutomatically = false
 
-            webViewClient = object : WebViewClient() {
+            hardenSessionWebView(this)
+            webViewClient = object : SecureEntryWebViewClient() {
                 override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
                     AndroidLog.e("TOKEN_BOOTSTRAP", "Render process gone: didCrash=${renderProcessCrashState(detail)}")
                     return true
@@ -10669,7 +10855,7 @@ class MainActivity : ComponentActivity() {
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
                     if (!tokenBootstrapPending) return
-                    if (url?.startsWith("https://playentry.org") != true) {
+                    if (!EntryOriginPolicy.isTrustedMainHost(url)) {
                         AndroidLog.w("TOKEN_BOOTSTRAP", "Unexpected URL for token bootstrap: $url")
                         return
                     }
@@ -10690,13 +10876,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            addJavascriptInterface(object {
-                @JavascriptInterface
-                fun postMessage(message: String) {
-                    AndroidLog.d("JS_BRIDGE", "[TOKEN] event received")
-                    runOnUiThread { onJsMessage(message, "TOKEN") }
-                }
-            }, "AndroidApp")
+            installEntryMessageListener(
+                this,
+                "AndroidApp",
+                "TOKEN",
+                EntryOriginPolicy::isTrustedMainHost
+            ) { message -> onJsMessage(message, "TOKEN") }
         }
 
         CookieManager.getInstance().apply {
@@ -10789,13 +10974,11 @@ class MainActivity : ComponentActivity() {
                 loadsImagesAutomatically = false
                 setSupportZoom(false)
             }
-            // ✅ JavaScript 브릿지 추가 (FOLLOW/SHARE GraphQL 결과 수신용)
-            addJavascriptInterface(WebAppInterface { msg ->
-                runOnUiThread {
-                    onJsMessage(msg, "ALARM")
-                }
-            }, "AndroidApp")
-            webViewClient = object : WebViewClient() {
+            installEntryMessageListener(this, "AndroidApp", "ALARM", { url ->
+                EntryOriginPolicy.isTrustedPath(url, "playentry.org", "/alarm")
+            }) { msg -> onJsMessage(msg, "ALARM") }
+            hardenSessionWebView(this)
+            webViewClient = object : SecureEntryWebViewClient() {
                 override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
                     AndroidLog.e("ALARM_POLLER", "Render process gone: didCrash=${renderProcessCrashState(detail)}")
                     return true
@@ -10803,7 +10986,7 @@ class MainActivity : ComponentActivity() {
 
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
-                    if (url?.startsWith("https://playentry.org/alarm") == true) {
+                    if (EntryOriginPolicy.isTrustedPath(url, "playentry.org", "/alarm")) {
                         AndroidLog.d("ALARM_POLLER", "Alarm page finished: $url")
                         // ✅ fetch hook 주입: 페이지의 GraphQL 응답 가로채기
                         view?.evaluateJavascript("""
@@ -10905,13 +11088,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            addJavascriptInterface(object {
-                @JavascriptInterface
-                fun postMessage(msg: String) {
-                    AndroidLog.d("JS_BRIDGE", "[ALARM] event received")
-                    runOnUiThread { onJsMessage(msg, "ALARM") }
-                }
-            }, "AndroidApp")
         }
 
         val cm = CookieManager.getInstance()
@@ -11587,6 +11763,8 @@ class MainActivity : ComponentActivity() {
         }
 
         val builder = NotificationCompat.Builder(this, channelId)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(buildLockScreenPlaceholder(channelId, smallIcon))
             .setSmallIcon(smallIcon)
             .setContentTitle(safeTitle)
             .setContentText(safeText)
@@ -12137,6 +12315,8 @@ class MainActivity : ComponentActivity() {
             NotificationCompat.BigTextStyle().bigText(state.text)
         }
         val builder = NotificationCompat.Builder(this, commentChannelId)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(buildLockScreenPlaceholder(commentChannelId, android.R.drawable.stat_notify_chat))
             .setSmallIcon(android.R.drawable.stat_notify_chat)
             .setContentTitle(state.title)
             .setContentText(state.text)
@@ -12364,16 +12544,17 @@ class MainActivity : ComponentActivity() {
             client.newCall(builder.build()).execute().use { resp ->
                 if (!resp.isSuccessful) return null
                 val body = resp.body ?: return null
-                val bytes = body.bytes()
+                val bytes = SafeImageDecoder.readBounded(body) ?: return null
                 val mime = resp.header("content-type") ?: ""
                 if (mime.isNotBlank() && !isAllowedImageMime(mime)) return null
                 val isSvg = safeUrl.contains(".svg", true) || mime.contains("svg", true) || looksLikeSvg(bytes)
                 val decoded = if (isSvg) {
+                    if (!SafeImageDecoder.isSafeSvg(bytes)) return null
                     renderSvgToBitmap(bytes, targetSize, targetSize)
                         ?: renderSvgWithWebView(String(bytes, Charsets.UTF_8), targetSize)
                 } else {
                     if (!looksLikeRasterImage(bytes)) return null
-                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    SafeImageDecoder.decodeRaster(bytes, targetSize)
                 }
                 return decoded?.let {
                     if (it.width == targetSize && it.height == targetSize) it
@@ -12825,11 +13006,20 @@ class MainActivity : ComponentActivity() {
     
     private fun fetchAvatarFromProfile(profilePath: String, onReady: (String?) -> Unit) {
         ensureHiddenWebView(this)
-        val url = if (profilePath.startsWith("http")) profilePath else "https://playentry.org${if (profilePath.startsWith("/")) profilePath else "/$profilePath"}"
+        val profileCandidate = when {
+            profilePath.startsWith("/") -> "https://playentry.org$profilePath"
+            profilePath.startsWith("https://", ignoreCase = true) -> profilePath
+            else -> "https://playentry.org/$profilePath"
+        }
+        val url = sanitizeImageUrl(profileCandidate)
+        if (url.isBlank()) {
+            onReady(null)
+            return
+        }
         
         pendingProfileCallback = onReady
         
-        hiddenWebView?.webViewClient = object : WebViewClient() {
+        hiddenWebView?.webViewClient = object : SecureEntryWebViewClient() {
             override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
                 AndroidLog.e("HIDDEN_WEBVIEW", "Render process gone in profile fetch: didCrash=${renderProcessCrashState(detail)}")
                 pendingProfileCallback?.invoke(null)
@@ -13277,7 +13467,7 @@ class MainActivity : ComponentActivity() {
                 val currentUrl = mainWebView?.url.orEmpty()
                 AndroidLog.d("LOGIN_OK", "현재 URL: $currentUrl")
 
-                if (currentUrl.startsWith("https://playentry.org") && !currentUrl.contains("/signin")) {
+                if (isMainContentUrl(currentUrl)) {
                     mainWebView?.postDelayed({
                         try {
                             // 기존 폴러 정리

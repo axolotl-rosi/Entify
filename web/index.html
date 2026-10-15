@@ -15,29 +15,11 @@
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Entify 엔트리 백그라운드 알림 클라이언트">
   <meta name="twitter:description" content="Entify Android 앱 공식 배포 페이지입니다. 안전한 설치와 백그라운드 알림 확인을 지원합니다.">
+  <link rel="stylesheet" href="/styles.css">
   <script src="/theme.js" defer></script>
-  <style>
-    :root{color-scheme:dark;--ink:#f4efff;--muted:#beb6ca;--brand:#a98cff;--brand2:#cfbdff;--soft:#2d2540;--line:#443b52;--surface:#1b1822;--notice-bg:#302515;--notice-line:#75562b;--notice-ink:#ffdca8;--header:rgba(18,16,22,.94);--shadow:rgba(0,0,0,.25);--bg:#121016}
-    :root[data-theme="light"]{color-scheme:light;--ink:#17151d;--muted:#625f6b;--brand:#6750a4;--brand2:#4f378b;--soft:#f5f1ff;--line:#ddd7e7;--surface:#fff;--notice-bg:#fff8eb;--notice-line:#f0d7ad;--notice-ink:#6b3b00;--header:rgba(251,249,255,.94);--shadow:rgba(30,22,48,.045);--bg:#fbf9ff}
-    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Pretendard,system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.65;transition:background-color .35s ease-in-out,color .35s ease-in-out}
-    a{color:var(--brand2)}.wrap{width:min(1080px,calc(100% - 32px));margin:auto}
-    header{position:sticky;top:0;z-index:3;background:var(--header);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
-    nav{height:64px;display:flex;align-items:center;justify-content:space-between;gap:18px}.brand{font-weight:800;text-decoration:none;color:var(--ink);font-size:1rem;letter-spacing:.14em}.nav-right,.links{display:flex;align-items:center;gap:16px}.links{font-size:.92rem}.links a{text-decoration:none;color:var(--muted);transition:color .25s ease-in-out}.links a:hover{color:var(--ink)}.theme-toggle{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:9px 14px;font:inherit;font-size:.82rem;font-weight:700;cursor:pointer;white-space:nowrap;transition:color .25s ease-in-out,border-color .25s ease-in-out,background-color .35s ease-in-out}.theme-toggle:hover{border-color:var(--brand);color:var(--brand2)}
-    .hero{padding:88px 0 58px;text-align:center}.eyebrow{display:inline-block;padding:6px 12px;border-radius:999px;background:var(--soft);color:var(--brand2);font-weight:750;font-size:.84rem}
-    h1{font-size:clamp(2.25rem,7vw,4.5rem);line-height:1.08;margin:22px auto 16px;letter-spacing:-.045em}.lead{max-width:720px;margin:0 auto;color:var(--muted);font-size:1.08rem}
-    .actions{display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:30px}.precheck{font-weight:750}.download{display:inline-flex;align-items:center;justify-content:center;min-width:260px;padding:16px 24px;border-radius:12px;background:var(--brand);color:#fff;text-decoration:none;font-weight:800;box-shadow:0 10px 28px rgba(103,80,164,.25);transition:transform .3s ease-in-out,background-color .3s ease-in-out,box-shadow .3s ease-in-out}.download:hover{background:var(--brand2);transform:translateY(-2px);box-shadow:0 14px 34px rgba(103,80,164,.32)}
-    .version{font-size:.85rem;color:var(--muted)}section{padding:62px 0;scroll-margin-top:70px}h2{font-size:clamp(1.65rem,4vw,2.35rem);letter-spacing:-.025em;margin:0 0 10px}.section-lead{color:var(--muted);max-width:760px;margin:0 0 28px}
-    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.card,details,.install{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px;box-shadow:0 4px 18px var(--shadow);transition:background-color .35s ease-in-out,border-color .35s ease-in-out,transform .3s ease-in-out}.card:hover{transform:translateY(-3px)}.card h3{margin:10px 0 6px}.kicker{color:var(--brand2);font-size:.75rem;font-weight:800;letter-spacing:.12em}.card p{margin:0;color:var(--muted)}
-    .notice{background:var(--notice-bg);border:1px solid var(--notice-line);color:var(--notice-ink);padding:18px 20px;border-radius:14px;margin:22px 0}
-    .flow{display:grid;gap:12px;counter-reset:step}.install{position:relative;padding-left:70px}.install:before{counter-increment:step;content:counter(step);position:absolute;left:22px;top:22px;width:32px;height:32px;display:grid;place-items:center;border-radius:50%;background:var(--soft);color:var(--brand2);font-weight:850}.install h3{margin:0 0 5px}.install p{margin:0;color:var(--muted)}
-    details{padding:0;overflow:hidden}summary{cursor:pointer;list-style:none;padding:20px 54px 20px 22px;font-weight:750;position:relative}summary::-webkit-details-marker{display:none}summary:after{content:"";position:absolute;right:24px;top:24px;width:8px;height:8px;border-right:2px solid var(--brand2);border-bottom:2px solid var(--brand2);transform:rotate(45deg);transition:transform .32s ease-in-out}details[open] summary:after{transform:rotate(225deg)}.answer{padding:0 22px 22px;color:var(--muted)}.answer p:first-child{margin-top:0}
-    code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.83rem;overflow-wrap:anywhere}.hash{display:block;background:#24212b;color:#f4efff;border-radius:10px;padding:12px;margin-top:10px}
-    footer{border-top:1px solid var(--line);padding:36px 0 48px;color:var(--muted);font-size:.9rem}.footer-row{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
-    @media(max-width:760px){.links{display:none}.nav-right{gap:8px}.grid{grid-template-columns:1fr}.hero{padding-top:58px}section{padding:46px 0}.install{padding-left:62px}}
-  </style>
 </head>
 <body>
-  <header><nav class="wrap"><a class="brand" href="#">ENTIFY</a><div class="nav-right"><div class="links"><a href="#features">기능</a><a href="#security-answers">보안 및 개인정보 답변</a><a href="#install">설치 방법</a><a href="https://github.com/axolotl-rosi/Entify">소스 코드</a></div><button class="theme-toggle" id="theme-toggle" type="button" aria-label="라이트 테마로 전환" aria-pressed="false">라이트 모드</button></div></nav></header>
+  <header><nav class="wrap"><a class="brand" href="#">ENTIFY</a><div class="nav-right"><div class="links"><a href="#install">설치</a><a href="#trust">신뢰 구조</a><a href="#features">기능</a><a href="#security-answers">보안 답변</a><a href="https://github.com/axolotl-rosi/Entify">소스 코드</a></div><button class="theme-toggle" id="theme-toggle" type="button" aria-label="라이트 테마로 전환" aria-pressed="false">라이트 모드</button></div></nav></header>
   <main>
     <section class="hero wrap">
       <span class="eyebrow">Android Source-Available 비공식 독립 클라이언트</span>
@@ -46,7 +28,7 @@
       <div class="actions">
         <a class="precheck" href="#security-answers">설치 전에 보안 및 개인정보 답변 먼저 보기</a>
         <a class="download" href="/download">Entify APK 다운로드</a>
-        <span class="version">v1.1.1 (Android 7.0 이상, Play 스토어 외부 설치)</span>
+        <span class="version">v1.2.0 (Android 7.0 이상, Play 스토어 외부 설치)</span>
       </div>
     </section>
 
@@ -61,12 +43,31 @@
       </div>
     </section>
 
+    <section id="trust" class="wrap">
+      <div class="section-heading"><div><span class="section-label">TRUST ARCHITECTURE</span><h2>신뢰해야 하는 범위를 줄였습니다</h2></div><p class="section-lead">비밀번호를 별도 서버로 보내지 않고, 세션 보관·페이지 통신·배포 검증을 서로 다른 경계로 나누어 한 계층의 문제가 전체 권한으로 번지지 않도록 설계했습니다.</p></div>
+      <div class="trust-flow" aria-label="Entify 보안 데이터 흐름">
+        <article class="trust-step"><span>01</span><h3>공식 페이지 로그인</h3><p>로그인은 앱이 만든 입력 폼이 아니라 <code>https://playentry.org</code> 페이지에서 진행됩니다.</p></article>
+        <div class="flow-line" aria-hidden="true"></div>
+        <article class="trust-step"><span>02</span><h3>기기 안에서 보호</h3><p>세션·토큰과 알림 제목·본문·원본 payload는 Android Keystore 키로 암호화됩니다.</p></article>
+        <div class="flow-line" aria-hidden="true"></div>
+        <article class="trust-step"><span>03</span><h3>엔트리로 직접 통신</h3><p>인증 자료는 Entify 중계 서버를 거치지 않고 엔트리 HTTPS API 요청에만 사용됩니다.</p></article>
+        <div class="flow-line" aria-hidden="true"></div>
+        <article class="trust-step"><span>04</span><h3>배포 파일 검증</h3><p>릴리스 버전, APK SHA-256과 서명 인증서 지문을 함께 공개합니다.</p></article>
+      </div>
+      <div class="assurance-grid">
+        <div><strong>WebView 경계</strong><p>정확한 HTTPS 출처, 최상위 프레임, 현재 경로와 메시지 크기를 모두 검사합니다.</p></div>
+        <div><strong>기기 노출 방어</strong><p>백업·화면 캡처·최근 앱 미리보기·가려진 터치와 Android 12 이상 오버레이를 제한합니다.</p></div>
+        <div><strong>응답 처리 방어</strong><p>API·HTML·이미지 크기 상한, 이미지 픽셀 수와 SVG 위험 선언을 검사합니다.</p></div>
+        <div><strong>공개된 한계</strong><p>루팅·후킹·손상된 OS와 공식 출처 자체의 XSS를 완전히 무효화한다고 주장하지 않습니다.</p></div>
+      </div>
+    </section>
+
     <section id="features" class="wrap">
       <h2>필요한 알림은 선명하게, 기록은 그대로</h2>
       <p class="section-lead">댓글, 좋아요, 팔로우, 리메이크, 공유, 시스템 알림을 의미에 맞게 분류하고, 실제 사용자 프로필과 작품 썸네일을 함께 보여줍니다.</p>
       <div class="grid">
         <article class="card"><div class="kicker">BACKGROUND</div><h3>백그라운드 알림</h3><p>화면이 꺼져 있어도 포그라운드 서비스가 새 알림을 확인합니다.</p></article>
-        <article class="card"><div class="kicker">ARCHIVE</div><h3>원본 알림 보관함</h3><p>영구 수집은 기본 동작입니다. 수신 당시의 원문과 메타데이터를 기기 안에 보관합니다.</p></article>
+        <article class="card"><div class="kicker">ARCHIVE</div><h3>원본 알림 보관함</h3><p>영구 수집은 기본 동작입니다. 인증값을 제외한 수신 원문과 메타데이터를 기기 안에 보관합니다.</p></article>
         <article class="card"><div class="kicker">CONTROL</div><h3>사용자별 알림 관리</h3><p>사용자와 알림 종류별로 피드 표시 여부를 세밀하게 조절합니다.</p></article>
       </div>
     </section>
@@ -79,17 +80,19 @@
         <details open><summary>아이디와 비밀번호를 Entify가 저장하나요?</summary><div class="answer"><p>아니요. 로그인 입력 화면은 <strong>https://playentry.org</strong>의 공식 로그인 페이지이며, Entify는 비밀번호를 별도 파일이나 서버에 저장하지 않습니다. 공식 페이지가 만든 로그인 결과만 사용합니다.</p></div></details>
         <details><summary>쿠키, 로그인 세션, 토큰은 왜 필요한가요?</summary><div class="answer"><p>엔트리의 비공개 알림은 로그인한 사용자만 조회할 수 있어 세션 쿠키, CSRF 값, x-token이 필요합니다. Entify는 공식 로그인 이후 이 값을 읽어 자동 로그인 유지와 알림 API 인증에만 사용합니다. API 요청 주소, 헤더, 본문 형식은 엔트리 호환성을 위해 임의로 변형하지 않습니다.</p></div></details>
         <details><summary>세션이 개발자 서버나 분석 서비스로 전송되나요?</summary><div class="answer"><p>아니요. 앱은 별도 중계 서버, 광고 SDK, 행동 분석 SDK를 두지 않습니다. 인증 정보는 기기에서 엔트리 서버로 직접 보내는 요청에만 붙습니다. 이 다운로드 페이지도 외부 분석 스크립트나 외부 폰트를 사용하지 않습니다.</p></div></details>
-        <details><summary>기기에는 어떻게 보관되나요?</summary><div class="answer"><p>v1.1.0부터 Entify가 별도로 보관하는 세션 사본과 토큰은 Android Keystore가 보호하는 키로 암호화합니다. 공식 로그인 화면을 담당하는 Android WebView도 자동 로그인을 위해 자체 앱 샌드박스에 쿠키를 유지합니다. 과거 평문 설정 값은 암호화 저장소로 옮긴 뒤 삭제하며, Keystore를 사용할 수 없으면 평문으로 낮춰 저장하지 않고 다시 로그인을 요구합니다. 앱 데이터는 클라우드 백업과 기기 이전 대상에서도 제외됩니다.</p></div></details>
+        <details><summary>기기에는 어떻게 보관되나요?</summary><div class="answer"><p>세션 사본과 토큰은 Android Keystore가 보호하는 키로 암호화합니다. 공식 로그인 WebView도 자동 로그인을 위해 앱 전용 쿠키 저장소를 사용합니다. 과거 평문 세션 값은 이전 후 삭제하고, Keystore 오류 시 평문으로 낮춰 저장하지 않습니다.</p><p>영구 알림 보관함의 제목·본문·원본 payload도 Keystore 키를 사용하는 AES-GCM으로 필드 암호화하며 기존 평문 행은 실행 후 암호화 형식으로 이전합니다. 검색과 분류에 필요한 종류·시각·사용자 식별자와 이미지 URL 같은 메타데이터는 Room SQLite에 남으므로, 루팅·잠금 해제 단말에서 모든 알림 메타데이터까지 보호된다고 주장하지 않습니다. 데이터베이스와 파일은 클라우드 백업·기기 이전에서 제외합니다.</p></div></details>
         <details><summary>로그아웃하면 무엇이 지워지나요?</summary><div class="answer"><p>암호화된 쿠키와 토큰, 남아 있을 수 있는 구버전 평문 세션 값을 지우고 WebView 세션도 종료합니다. 앱 삭제 시 Android 앱 전용 데이터도 함께 삭제됩니다.</p></div></details>
         <details><summary>공식 로그인 페이지 감시와 리다이렉트는 무엇인가요?</summary><div class="answer"><p>로그인 완료와 세션 갱신을 알아보기 위해 앱 내부 브라우저의 페이지 상태를 확인합니다. 세션을 가진 WebView는 원격 디버깅, 혼합 HTTP 콘텐츠, 제3자 쿠키, 파일 접근을 허용하지 않으며 화면 캡처도 차단합니다. 일반 웹 탐색용 브라우저가 아니라 엔트리 기능 수행을 위한 제한된 실행 환경입니다.</p></div></details>
+        <details><summary>엔트리 페이지에 XSS가 있다면 Entify도 위험한가요?</summary><div class="answer"><p>공식 출처 자체에서 실행되는 XSS를 앱이 완전히 무효화할 수는 없습니다. Entify는 외부 도메인 이동을 차단하고, 레거시 JavaScript 인터페이스를 사용하지 않으며, 메시지를 정확한 HTTPS 출처·최상위 프레임·현재 경로·크기 기준으로 다시 검사합니다. 메시지 채널은 파일이나 임의 Android API를 공개하지 않습니다. 이 조치는 영향 범위를 줄이지만 엔트리 원본 페이지의 취약점을 치료한다는 의미는 아닙니다.</p></div></details>
+        <details><summary>추가로 어떤 방어가 적용되나요?</summary><div class="answer"><p>화면 캡처와 최근 앱 미리보기를 막고, Android 12 이상에서는 다른 앱의 화면 오버레이를 숨기며 가려진 터치를 거부합니다. API·HTML·이미지 응답에는 크기 제한이 있고, 큰 이미지의 픽셀 수와 SVG 위험 선언을 검사합니다. 인증서 고정은 엔트리의 정상 인증서 교체를 장애로 만들 수 있어 적용하지 않고 시스템 인증서만 신뢰합니다.</p></div></details>
         <details><summary>어떤 Android 권한을 사용하나요?</summary><div class="answer"><p>인터넷은 엔트리 통신, 알림 권한은 새 소식 표시, 포그라운드 서비스, Wake Lock은 백그라운드 확인, 부팅 완료 권한은 사용자가 켠 감시 상태 복원에 사용합니다. 배터리 최적화 제외는 안정적인 주기 확인을 위한 선택 요청입니다.</p></div></details>
-        <details><summary>Play 스토어 앱이 아닌데 설치해도 되나요?</summary><div class="answer"><p>외부 APK에는 Play 스토어 심사가 적용되지 않으므로 경고가 표시되는 것이 정상입니다. 이 페이지와 GitHub 소스를 교차 확인하고 아래 SHA-256이 다운로드 파일과 일치하는지 검증하세요. Play Protect가 악성으로 판단해 차단하면 억지로 우회하지 말고 설치를 중단한 뒤 이슈로 알려주세요.</p><code class="hash">SHA-256: 52499E981DD0AC24C24ED3E567DA82F1BD489BDAB86B0A413384A6488B8A7439</code></div></details>
+        <details><summary>Play 스토어 앱이 아닌데 설치해도 되나요?</summary><div class="answer"><p>외부 APK에는 Play 스토어 심사가 적용되지 않으므로 경고가 표시되는 것이 정상입니다. 이 페이지와 GitHub 소스를 교차 확인하고 아래 SHA-256이 다운로드 파일과 일치하는지 검증하세요. Play Protect가 악성으로 판단해 차단하면 억지로 우회하지 말고 설치를 중단한 뒤 이슈로 알려주세요.</p><code class="hash">SHA-256: B52ECDBE60A7D8124672808FCF4483F11A3FDD3ADF0C8D4D264991C29F6AB703</code><code class="hash">서명 인증서 SHA-256: 8905D03BAE430503CE1811C9078C96DC5AD2493BD6999688291A4FE209CE776D</code></div></details>
         <details><summary>릴리스 서명은 어떻게 관리하나요?</summary><div class="answer"><p>v1.x는 기존 설치자의 업데이트 호환성을 위해 초기 인증서를 유지합니다. 새 운영 키 설정은 별도 빌드 모드로 분리되어 있으며, 키 경로나 비밀번호가 하나라도 빠지면 빌드가 실패합니다. 전용 운영 키로 전환할 때는 기존 앱과 서명이 달라져 재설치 또는 별도 앱 ID가 필요하므로 사전 고지합니다.</p></div></details>
         <details><summary>직접 검토할 수 있나요?</summary><div class="answer"><p>프로젝트 코드는 Entify Source-Available License v1.0으로 공개되어 있으며 OSI 승인 오픈소스 라이선스는 아닙니다. 전체 소스, 보안 구조, 개인정보 처리 설명을 <a href="https://github.com/axolotl-rosi/Entify">GitHub 저장소</a>에서 확인할 수 있습니다. 발견한 취약점은 공개 이슈에 세션 값을 첨부하지 말고 보안 문서의 신고 절차를 이용해주세요.</p></div></details>
       </div>
     </section>
 
   </main>
-  <footer><div class="wrap footer-row"><span>Entify v1.1.1 (엔트리와 독립적으로 개발된 비공식 프로젝트)</span><span><a href="https://github.com/axolotl-rosi/Entify/blob/main/SECURITY.md">보안 정책</a> | <a href="https://github.com/axolotl-rosi/Entify/blob/main/PRIVACY.md">개인정보 설명</a> | <a href="https://github.com/axolotl-rosi/Entify">GitHub</a></span></div></footer>
+  <footer><div class="wrap footer-row"><span>Entify v1.2.0 (엔트리와 독립적으로 개발된 비공식 프로젝트)</span><span><a href="https://github.com/axolotl-rosi/Entify/blob/main/SECURITY.md">보안 정책</a> | <a href="https://github.com/axolotl-rosi/Entify/blob/main/PRIVACY.md">개인정보 설명</a> | <a href="https://github.com/axolotl-rosi/Entify">GitHub</a></span></div></footer>
 </body>
 </html>

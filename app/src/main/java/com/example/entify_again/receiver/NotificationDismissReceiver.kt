@@ -3,7 +3,7 @@ package com.example.entify_again.receiver
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.util.Log
+import com.example.entify_again.util.PrivacyLog as Log
 import com.example.entify_again.util.PreferenceManager
 
 /**

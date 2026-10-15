@@ -6,6 +6,9 @@ import com.example.entify_again.data.db.NotificationDao
 import com.example.entify_again.data.entity.NotificationEntity
 import com.example.entify_again.data.entity.NotificationArchiveEntity
 import com.example.entify_again.data.entity.asArchive
+import com.example.entify_again.data.entity.encrypted
+import com.example.entify_again.data.entity.decrypted
+import com.example.entify_again.util.DatabaseFieldCipher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -13,26 +16,32 @@ class NotificationRepository(context: Context) {
 
     private val dao: NotificationDao = EntifyDatabase.getInstance(context).notificationDao()
 
-    fun getAllNotifications(): Flow<List<NotificationEntity>> = dao.getAllNotifications()
+    fun getAllNotifications(): Flow<List<NotificationEntity>> =
+        dao.getAllNotifications().map { list -> list.map { it.decrypted() } }
 
-    fun getByCategory(category: String): Flow<List<NotificationEntity>> = dao.getByCategory(category)
+    fun getByCategory(category: String): Flow<List<NotificationEntity>> =
+        dao.getByCategory(category).map { list -> list.map { it.decrypted() } }
 
-    fun getSystemNotifications(): Flow<List<NotificationEntity>> = dao.getSystemNotifications()
+    fun getSystemNotifications(): Flow<List<NotificationEntity>> =
+        dao.getSystemNotifications().map { list -> list.map { it.decrypted() } }
 
-    fun getStarred(): Flow<List<NotificationEntity>> = dao.getStarred()
+    fun getStarred(): Flow<List<NotificationEntity>> =
+        dao.getStarred().map { list -> list.map { it.decrypted() } }
  
-    fun getBlocked(): Flow<List<NotificationEntity>> = dao.getBlocked()
+    fun getBlocked(): Flow<List<NotificationEntity>> =
+        dao.getBlocked().map { list -> list.map { it.decrypted() } }
 
     fun getAllForStats(): Flow<List<NotificationEntity>> =
-        dao.getArchive().map { list -> list.map { it.asNotification() } }
+        dao.getArchive().map { list -> list.map { it.asNotification().decrypted() } }
 
-    fun getArchive(): Flow<List<NotificationArchiveEntity>> = dao.getArchive()
+    fun getArchive(): Flow<List<NotificationArchiveEntity>> =
+        dao.getArchive().map { list -> list.map { it.decrypted() } }
 
     suspend fun countArchive(): Int = dao.countArchive()
 
     fun getUnreadCount(): Flow<Int> = dao.getUnreadCount()
 
-    suspend fun insertIfNew(notification: NotificationEntity): Long {
+    suspend fun insertIfNew(notification: NotificationEntity, rawPayload: String? = null): Long {
         val existingId = dao.findDuplicateNotificationId(notification.category, notification.actor, notification.createdAt)
         if (existingId != null) {
             if (!notification.actorImageUrl.isNullOrBlank()) {
@@ -43,10 +52,20 @@ class NotificationRepository(context: Context) {
                 dao.updateProjectThumbnail(notification.topicId, notification.projectThumbnailUrl)
                 dao.updateArchiveProjectThumbnail(notification.topicId, notification.projectThumbnailUrl)
             }
+            if (!rawPayload.isNullOrBlank()) {
+                dao.updateArchiveRawPayload(
+                    notification.topicId,
+                    DatabaseFieldCipher.encrypt(rawPayload) ?: error("Payload encryption failed")
+                )
+            }
             return existingId
         }
-        val id = dao.insertIfNew(notification)
-        dao.archiveIfNew(notification.asArchive())
+        // Finish all cryptographic work before the first write. A cipher failure
+        // must not leave only one of the live/archive rows persisted.
+        val encryptedEntity = notification.encrypted()
+        val encryptedArchive = notification.asArchive(rawPayload).encrypted()
+        val id = dao.insertIfNew(encryptedEntity)
+        dao.archiveIfNew(encryptedArchive)
         return id
     }
 
@@ -61,7 +80,7 @@ class NotificationRepository(context: Context) {
             }
             return existingId
         }
-        return dao.archiveIfNew(notification)
+        return dao.archiveIfNew(notification.encrypted())
     }
 
     suspend fun markRead(id: Long) = dao.markRead(id)
@@ -76,7 +95,8 @@ class NotificationRepository(context: Context) {
 
     suspend fun setBlockedByActor(actor: String, blocked: Boolean) = dao.setBlockedByActor(actor, blocked)
 
-    suspend fun updateBodyByTopicId(topicId: String, body: String) = dao.updateBodyByTopicId(topicId, body)
+    suspend fun updateBodyByTopicId(topicId: String, body: String) =
+        dao.updateBodyByTopicId(topicId, DatabaseFieldCipher.encrypt(body).orEmpty())
 
     suspend fun updateActorImageByTopicId(topicId: String, imageUrl: String) = dao.updateActorImageByTopicId(topicId, imageUrl)
 
@@ -105,7 +125,7 @@ class NotificationRepository(context: Context) {
 
     suspend fun count(): Int = dao.count()
 
-    suspend fun getById(id: Long): NotificationEntity? = dao.getById(id)
+    suspend fun getById(id: Long): NotificationEntity? = dao.getById(id)?.decrypted()
 
     suspend fun isReadByTopicId(topicId: String): Boolean = dao.isReadByTopicId(topicId)
 

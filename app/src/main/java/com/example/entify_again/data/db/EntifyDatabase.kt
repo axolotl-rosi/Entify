@@ -8,6 +8,13 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.entify_again.data.entity.NotificationArchiveEntity
 import com.example.entify_again.data.entity.NotificationEntity
+import com.example.entify_again.data.entity.encrypted
+import com.example.entify_again.util.DatabaseFieldCipher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 
 @Database(entities = [NotificationEntity::class, NotificationArchiveEntity::class], version = 3, exportSchema = false)
 abstract class EntifyDatabase : RoomDatabase() {
@@ -53,18 +60,55 @@ abstract class EntifyDatabase : RoomDatabase() {
 
         @Volatile
         private var INSTANCE: EntifyDatabase? = null
+        private val encryptionMigrationStarted = AtomicBoolean(false)
+        private val encryptionMigrationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
         fun getInstance(context: Context): EntifyDatabase {
-            return INSTANCE ?: synchronized(this) {
+            DatabaseFieldCipher.init(context)
+            val database = INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
                     context.applicationContext,
                     EntifyDatabase::class.java,
                     "entify_db"
                 )
                     .addMigrations(MIGRATION_2_3)
-                    .fallbackToDestructiveMigration()
                     .build()
-                    .also { INSTANCE = it }
+                    .also {
+                        INSTANCE = it
+                    }
+            }
+            migrateLegacyPlaintextRows(database)
+            return database
+        }
+
+        private fun migrateLegacyPlaintextRows(database: EntifyDatabase) {
+            if (!encryptionMigrationStarted.compareAndSet(false, true)) return
+            encryptionMigrationScope.launch {
+                try {
+                    val dao = database.notificationDao()
+                    dao.getAllRawForEncryption().forEach { row ->
+                        if (!DatabaseFieldCipher.isEncrypted(row.title) || !DatabaseFieldCipher.isEncrypted(row.body)) {
+                            val encrypted = row.encrypted()
+                            dao.updateEncryptedFields(row.id, encrypted.title, encrypted.body)
+                        }
+                    }
+                    dao.getAllArchiveRawForEncryption().forEach { row ->
+                        if (!DatabaseFieldCipher.isEncrypted(row.title) ||
+                            !DatabaseFieldCipher.isEncrypted(row.body) ||
+                            (!row.rawPayload.isNullOrBlank() && !DatabaseFieldCipher.isEncrypted(row.rawPayload))
+                        ) {
+                            val encrypted = row.encrypted()
+                            dao.updateArchiveEncryptedFields(
+                                row.id,
+                                encrypted.title,
+                                encrypted.body,
+                                encrypted.rawPayload
+                            )
+                        }
+                    }
+                } catch (_: Exception) {
+                    encryptionMigrationStarted.set(false)
+                }
             }
         }
     }

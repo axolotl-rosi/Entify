@@ -24,7 +24,6 @@ data class SettingsUiState(
     val pollingIntervalMs: Long = PreferenceManager.DEFAULT_POLLING_INTERVAL_MS,
     val notificationCount: Int = 0,
     val archiveCount: Int = 0,
-    val rememberNotifications: Boolean = false,
     val rememberedNotificationCount: Int = 0,
     val remainingProfileRefreshCount: Int = 5,
     val isPushNotificationEnabled: Boolean = true,
@@ -120,7 +119,6 @@ class SettingsViewModel(
             themeMode = mode,
             pollingIntervalMs = prefs.pollingIntervalMs,
             archiveCount = 0,
-            rememberNotifications = prefs.rememberNotifications,
             rememberedNotificationCount = prefs.getRememberedNotificationCount(),
             remainingProfileRefreshCount = prefs.getRemainingProfileRefreshCount(),
             isPushNotificationEnabled = prefs.isPushNotificationEnabled,
@@ -183,19 +181,6 @@ class SettingsViewModel(
         viewModelScope.launch {
             repository.deleteAll()
             _uiState.update { it.copy(notificationCount = 0) }
-        }
-    }
-
-    fun setRememberNotifications(enabled: Boolean) {
-        prefs.rememberNotifications = enabled
-        if (!enabled) {
-            prefs.clearNotificationMemory()
-        }
-        _uiState.update {
-            it.copy(
-                rememberNotifications = enabled,
-                rememberedNotificationCount = prefs.getRememberedNotificationCount()
-            )
         }
     }
 

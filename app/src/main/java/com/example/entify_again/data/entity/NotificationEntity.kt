@@ -93,3 +93,25 @@ fun NotificationEntity.asArchive(rawPayload: String? = null): NotificationArchiv
         rawPayload = rawPayload,
         createdAt = createdAt
     )
+
+fun NotificationEntity.encrypted(): NotificationEntity = copy(
+    title = com.example.entify_again.util.DatabaseFieldCipher.encrypt(title) ?: title,
+    body = com.example.entify_again.util.DatabaseFieldCipher.encrypt(body) ?: body
+)
+
+fun NotificationEntity.decrypted(): NotificationEntity = copy(
+    title = com.example.entify_again.util.DatabaseFieldCipher.decrypt(title) ?: title,
+    body = com.example.entify_again.util.DatabaseFieldCipher.decrypt(body) ?: body
+)
+
+fun NotificationArchiveEntity.encrypted(): NotificationArchiveEntity = copy(
+    title = com.example.entify_again.util.DatabaseFieldCipher.encrypt(title) ?: title,
+    body = com.example.entify_again.util.DatabaseFieldCipher.encrypt(body) ?: body,
+    rawPayload = com.example.entify_again.util.DatabaseFieldCipher.encrypt(rawPayload)
+)
+
+fun NotificationArchiveEntity.decrypted(): NotificationArchiveEntity = copy(
+    title = com.example.entify_again.util.DatabaseFieldCipher.decrypt(title) ?: title,
+    body = com.example.entify_again.util.DatabaseFieldCipher.decrypt(body) ?: body,
+    rawPayload = com.example.entify_again.util.DatabaseFieldCipher.decrypt(rawPayload)
+)

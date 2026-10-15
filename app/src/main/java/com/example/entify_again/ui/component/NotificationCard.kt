@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
+import com.example.entify_again.webview.EntryOriginPolicy
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
@@ -709,8 +710,7 @@ private fun formatRelativeTime(millis: Long): String {
 }
 
 private fun isNonInteractiveDeepLink(url: String?): Boolean {
-    val clean = url?.trim().orEmpty()
-    return clean.contains("space.playentry.org", ignoreCase = true)
+    return EntryOriginPolicy.isSpaceHost(url)
 }
 
 private fun buildHighlightedActionText(

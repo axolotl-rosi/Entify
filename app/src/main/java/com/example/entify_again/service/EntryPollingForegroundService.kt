@@ -19,7 +19,7 @@ import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import android.os.IBinder
-import android.util.Log
+import com.example.entify_again.util.PrivacyLog as Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -29,6 +29,9 @@ import com.example.entify_again.util.EntryTemplateFormatter
 import com.example.entify_again.util.NotificationSemantics
 import com.example.entify_again.util.PreferenceManager
 import com.example.entify_again.util.SecurityUtil
+import com.example.entify_again.util.SafeImageDecoder
+import com.example.entify_again.util.SafeResponseReader
+import com.example.entify_again.webview.EntryOriginPolicy
 import com.example.entify_again.util.UserProfileFetcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -48,6 +51,7 @@ import org.json.JSONObject
 import com.example.entify_again.data.db.EntifyDatabase
 import com.example.entify_again.data.entity.NotificationEntity
 import com.example.entify_again.data.entity.asArchive
+import com.example.entify_again.data.entity.encrypted
 import com.example.entify_again.receiver.NotificationDismissReceiver
 import java.text.SimpleDateFormat
 import java.util.LinkedHashSet
@@ -413,7 +417,7 @@ class EntryPollingForegroundService : Service() {
                 Log.w(TAG, "SELECT_TOPICS HTTP ${response.code}")
                 return@use emptyList()
             }
-            val text = response.body?.string().orEmpty()
+            val text = SafeResponseReader.readText(response.body).orEmpty()
             if (text.isBlank()) return@use emptyList()
 
             val root = runCatching { JSONObject(text) }.getOrNull() ?: return@use emptyList()
@@ -452,6 +456,11 @@ class EntryPollingForegroundService : Service() {
         )
         val semanticKind = NotificationSemantics.resolve(
             template = template,
+            message = sequenceOf(
+                topic.optString("message"),
+                topic.optString("title"),
+                topic.optString("body")
+            ).filter { it.isNotBlank() }.joinToString(" "),
             declaredCategory = topic.optString("category")
         )
         val category = semanticKind.category
@@ -512,7 +521,17 @@ class EntryPollingForegroundService : Service() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
+            val publicNotification = NotificationCompat.Builder(this, channelId)
+                .setSmallIcon(pickSmallIcon(semanticIconType))
+                .setContentTitle("새 Entify 알림")
+                .setContentText("잠금을 해제하여 알림 내용을 확인하세요.")
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setAutoCancel(isInteractive)
+                .build()
+
             val builder = NotificationCompat.Builder(this, channelId)
+                .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                .setPublicVersion(publicNotification)
                 .setSmallIcon(pickSmallIcon(semanticIconType))
                 .setContentTitle(enrichment.title)
                 .setContentText(enrichment.body)
@@ -557,8 +576,22 @@ class EntryPollingForegroundService : Service() {
                     )
                 val existingId = dao.findDuplicateNotificationId(category, actor, entity.createdAt)
                 if (existingId == null) {
-                    dao.insertIfNew(entity)
-                    dao.archiveIfNew(entity.asArchive(rawPayload = topic.toString()))
+                    val safePayload = com.example.entify_again.util.PayloadSanitizer.sanitize(topic.toString())
+                    // Encrypt both representations before the first write. If the
+                    // Keystore operation fails, neither row is written as plaintext.
+                    val encryptedEntity = entity.encrypted()
+                    val encryptedArchive = entity.asArchive(rawPayload = safePayload).encrypted()
+                    dao.insertIfNew(encryptedEntity)
+                    dao.archiveIfNew(encryptedArchive)
+                } else {
+                    val safePayload = com.example.entify_again.util.PayloadSanitizer.sanitize(topic.toString())
+                    if (!safePayload.isNullOrBlank()) {
+                        dao.updateArchiveRawPayload(
+                            topicId,
+                            com.example.entify_again.util.DatabaseFieldCipher.encrypt(safePayload)
+                                ?: error("Payload encryption failed")
+                        )
+                    }
                 }
                 if (!cachedImage.isNullOrBlank()) {
                     dao.updateActorImage(topicId, actor, cachedImage)
@@ -1042,7 +1075,11 @@ class EntryPollingForegroundService : Service() {
                     .put("sort", "created")
                     .put("order", -1)
             )
-        val referer = if (refererUrl.startsWith("https://playentry.org/")) refererUrl else "https://playentry.org/project/$targetId"
+        val referer = if (EntryOriginPolicy.isTrustedMainHost(refererUrl)) {
+            refererUrl
+        } else {
+            "https://playentry.org/project/$targetId"
+        }
         val root = executeGraphql(query, variables, referer = referer) ?: return null
         val list = root.optJSONObject("data")
             ?.optJSONObject("commentList")
@@ -1119,7 +1156,7 @@ class EntryPollingForegroundService : Service() {
             .build()
         return client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return@use null
-            val text = response.body?.string().orEmpty()
+            val text = SafeResponseReader.readText(response.body).orEmpty()
             if (text.isBlank()) return@use null
             val root = runCatching { JSONObject(text) }.getOrNull() ?: return@use null
             val errors = root.optJSONArray("errors")
@@ -1143,13 +1180,14 @@ class EntryPollingForegroundService : Service() {
             if (!response.isSuccessful) return@use null
             val mime = response.header("content-type").orEmpty()
             if (!isAllowedImageMime(mime)) return@use null
-            val bytes = response.body?.bytes() ?: return@use null
+            val bytes = response.body?.let { SafeImageDecoder.readBounded(it) } ?: return@use null
             val isSvg = mime.contains("svg", true) || url.contains(".svg", true) || looksLikeSvg(bytes)
             val decoded = if (isSvg) {
+                if (!SafeImageDecoder.isSafeSvg(bytes)) return@use null
                 renderSvgToBitmap(bytes, size, size)
             } else {
                 if (!looksLikeRasterImage(bytes)) return@use null
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                SafeImageDecoder.decodeRaster(bytes, size)
             } ?: return@use null
             if (decoded.width == size && decoded.height == size) decoded
             else Bitmap.createScaledBitmap(decoded, size, size, true)
@@ -1434,6 +1472,7 @@ class EntryPollingForegroundService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         return NotificationCompat.Builder(this, SERVICE_CHANNEL_ID)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setSmallIcon(android.R.drawable.stat_notify_sync)
             .setContentTitle("Entify 알림 감시 중")
             .setContentText(text)
@@ -1481,7 +1520,7 @@ class EntryPollingForegroundService : Service() {
 
     private fun isNonInteractiveNotification(template: String, deepLink: String?): Boolean {
         return template.contains("space", ignoreCase = true) ||
-            (deepLink?.contains("space.playentry.org", ignoreCase = true) == true)
+            EntryOriginPolicy.isSpaceHost(deepLink)
     }
 
     private fun stableId(key: String): Int {

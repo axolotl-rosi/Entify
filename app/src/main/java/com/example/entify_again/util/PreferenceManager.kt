@@ -195,8 +195,11 @@ class PreferenceManager(context: Context) {
 
     // 알림 영구 보관 설정 (절대 지워지지 않는 알림 기록 로그)
     var permanentArchiveEnabled: Boolean
-        get() = prefs.getBoolean(KEY_PERMANENT_ARCHIVE_ENABLED, true)
-        set(value) = prefs.edit().putBoolean(KEY_PERMANENT_ARCHIVE_ENABLED, value).apply()
+        get() = true
+        set(@Suppress("UNUSED_PARAMETER") value) {
+            // The archive is baseline behavior, not a user-facing opt-in toggle.
+            prefs.edit().remove(KEY_PERMANENT_ARCHIVE_ENABLED).apply()
+        }
 
     // 카테고리별 중요도 (sound, vibrate, silent, off)
     fun getCategoryImportance(category: String): String =
@@ -501,8 +504,12 @@ class PreferenceManager(context: Context) {
     }
 
     var rememberNotifications: Boolean
-        get() = prefs.getBoolean(KEY_REMEMBER_NOTIFICATIONS, true)
-        set(value) = prefs.edit().putBoolean(KEY_REMEMBER_NOTIFICATIONS, value).apply()
+        get() = true
+        set(@Suppress("UNUSED_PARAMETER") value) {
+            // Notification memory and the original archive are baseline behavior,
+            // not an optional toggle. Remove stale values from older releases.
+            prefs.edit().remove(KEY_REMEMBER_NOTIFICATIONS).apply()
+        }
 
     var notificationMemoryGeneration: Long
         get() = prefs.getLong(KEY_NOTIFICATION_MEMORY_GENERATION, 0L)

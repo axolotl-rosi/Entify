@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import com.example.entify_again.BuildConfig
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -292,7 +293,7 @@ fun SettingsScreen(
         SettingsItem(
             icon = Icons.Default.Info,
             title = "Entify",
-            subtitle = "v1.0 - PlayEntry 알림 앱"
+            subtitle = "v${BuildConfig.VERSION_NAME} - 엔트리 알림 클라이언트"
         )
 
         Spacer(modifier = Modifier.height(32.dp))

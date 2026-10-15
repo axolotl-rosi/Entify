@@ -4,7 +4,8 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.util.Log
+import com.example.entify_again.util.PrivacyLog as Log
+import com.example.entify_again.webview.EntryOriginPolicy
 import java.util.Locale
 
 /**
@@ -52,33 +53,7 @@ object SecurityUtil {
         if (urlRaw.isNullOrBlank()) return false
         val trimmed = urlRaw.trim()
         if (trimmed.length > MAX_URL_LENGTH) return false
-
-        // 위험 스킴 조기 차단
-        val lower = trimmed.lowercase(Locale.ROOT)
-        for (scheme in DANGEROUS_SCHEMES) {
-            if (lower.startsWith("$scheme:")) return false
-        }
-        if (trimmed.contains('\u0000') || trimmed.contains('\n') || trimmed.contains('\r')) return false
-
-        val uri = runCatching { Uri.parse(trimmed) }.getOrNull() ?: return false
-        val scheme = uri.scheme?.lowercase(Locale.ROOT) ?: return false
-        if (scheme != "https") return false
-
-        // UserInfo(@) 차단 (e.g. https://playentry.org@attacker.com)
-        if (!uri.userInfo.isNullOrBlank()) return false
-
-        // Host 검증
-        val host = uri.host?.lowercase(Locale.ROOT) ?: return false
-        if (!ALLOWED_HOST_REGEX.matches(host)) return false
-
-        // 비정상 포트 차단 (기본 https 443 혹은 포트 미지정만 허용)
-        if (uri.port != -1 && uri.port != 443) return false
-
-        // Path 순회 차단
-        val path = uri.encodedPath.orEmpty()
-        if (path.contains("..")) return false
-
-        return true
+        return EntryOriginPolicy.isTrusted(trimmed)
     }
 
     /**
@@ -95,18 +70,7 @@ object SecurityUtil {
             return isSafeImageDataUrl(trimmed)
         }
 
-        val uri = runCatching { Uri.parse(trimmed) }.getOrNull() ?: return false
-        val scheme = uri.scheme?.lowercase(Locale.ROOT) ?: return false
-        if (scheme != "https" && scheme != "http") return false
-        if (!uri.userInfo.isNullOrBlank()) return false
-
-        val host = uri.host?.lowercase(Locale.ROOT) ?: return false
-        if (!ALLOWED_IMAGE_HOST_REGEX.matches(host)) return false
-
-        val path = uri.encodedPath.orEmpty().lowercase(Locale.ROOT)
-        if (path.contains("..")) return false
-
-        return true
+        return EntryOriginPolicy.isTrustedImageHost(trimmed)
     }
 
     private fun isSafeImageDataUrl(dataUrl: String): Boolean {

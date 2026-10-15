@@ -7,7 +7,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.util.Log
+import com.example.entify_again.util.PrivacyLog as Log
 import androidx.core.app.NotificationCompat
 import com.example.entify_again.MainActivity
 import com.example.entify_again.R
@@ -72,6 +72,7 @@ class BootReceiver : BroadcastReceiver() {
         )
 
         val notification = NotificationCompat.Builder(context, BOOT_CHANNEL_ID)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setSmallIcon(R.drawable.ic_stat_like)
             .setContentTitle("Entify 실시간 감시 재개")
             .setContentText("기기가 재부팅되어 엔트리 알림 감시를 자동으로 다시 시작했습니다.")
