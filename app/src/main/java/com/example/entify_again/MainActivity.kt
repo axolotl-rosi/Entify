@@ -117,6 +117,9 @@ class MainActivity : ComponentActivity() {
         val host = uri.host?.lowercase(java.util.Locale.ROOT) ?: return false
         return host == "playentry.org" || host.endsWith(".playentry.org")
     }
+
+    private fun renderProcessCrashState(detail: RenderProcessGoneDetail?): Boolean? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) detail?.didCrash() else null
     private val client = OkHttpClient()
     private val entryUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     private lateinit var preferenceManager: PreferenceManager
@@ -1583,7 +1586,7 @@ class MainActivity : ComponentActivity() {
         // 숨김 WebView 설정
         hiddenWebView?.webViewClient = object : WebViewClient() {
             override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
-                AndroidLog.e("HIDDEN_WEBVIEW", "Render process gone: didCrash=${detail?.didCrash()}")
+                AndroidLog.e("HIDDEN_WEBVIEW", "Render process gone: didCrash=${renderProcessCrashState(detail)}")
                 return true
             }
 
@@ -1608,8 +1611,8 @@ class MainActivity : ComponentActivity() {
                     // ✅ 토큰 기다렸다가 → findComment() 실행
                     val xTokenPref = preferenceManager.xToken.orEmpty()
                     val csrfTokenPref = preferenceManager.csrfToken.orEmpty()
-        val storedUid = preferenceManager.commentUserId?.trim().orEmpty()
-        val runFindAfterToken = """
+                    val storedUid = preferenceManager.commentUserId?.trim().orEmpty()
+                    val runFindAfterToken = """
                         (function waitToken(){
                             try{
                                 const optToken = ${JSONObject.quote(xTokenPref)};
@@ -2417,7 +2420,7 @@ class MainActivity : ComponentActivity() {
 
                                     webViewClient = object : WebViewClient() {
                                         override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
-                                            AndroidLog.e("MAIN_WEBVIEW", "Render process gone: didCrash=${detail?.didCrash()}")
+                                            AndroidLog.e("MAIN_WEBVIEW", "Render process gone: didCrash=${renderProcessCrashState(detail)}")
                                             return true
                                         }
 
@@ -9915,7 +9918,7 @@ class MainActivity : ComponentActivity() {
 
             webViewClient = object : WebViewClient() {
                 override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
-                    AndroidLog.e("PROFILE", "Render process gone: didCrash=${detail?.didCrash()}")
+                    AndroidLog.e("PROFILE", "Render process gone: didCrash=${renderProcessCrashState(detail)}")
                     return true
                 }
 
@@ -10397,7 +10400,7 @@ class MainActivity : ComponentActivity() {
             // ✅ ② onPageFinished 이후에만 JS 주입하도록 수정
             webViewClient = object : WebViewClient() {
                 override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
-                    AndroidLog.e("FOLLOW_EXTRACT", "Render process gone: didCrash=${detail?.didCrash()}")
+                    AndroidLog.e("FOLLOW_EXTRACT", "Render process gone: didCrash=${renderProcessCrashState(detail)}")
                     return true
                 }
 
@@ -10457,7 +10460,7 @@ class MainActivity : ComponentActivity() {
             }
             webViewClient = object : WebViewClient() {
                 override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
-                    AndroidLog.e("FOLLOW_GRAPHQL", "Render process gone: didCrash=${detail?.didCrash()}")
+                    AndroidLog.e("FOLLOW_GRAPHQL", "Render process gone: didCrash=${renderProcessCrashState(detail)}")
                     return true
                 }
 
@@ -10560,7 +10563,7 @@ class MainActivity : ComponentActivity() {
             }
             webViewClient = object : WebViewClient() {
                 override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
-                    AndroidLog.e("SHARE_GRAPHQL", "Render process gone: didCrash=${detail?.didCrash()}")
+                    AndroidLog.e("SHARE_GRAPHQL", "Render process gone: didCrash=${renderProcessCrashState(detail)}")
                     return true
                 }
 
@@ -10659,7 +10662,7 @@ class MainActivity : ComponentActivity() {
 
             webViewClient = object : WebViewClient() {
                 override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
-                    AndroidLog.e("TOKEN_BOOTSTRAP", "Render process gone: didCrash=${detail?.didCrash()}")
+                    AndroidLog.e("TOKEN_BOOTSTRAP", "Render process gone: didCrash=${renderProcessCrashState(detail)}")
                     return true
                 }
 
@@ -10794,7 +10797,7 @@ class MainActivity : ComponentActivity() {
             }, "AndroidApp")
             webViewClient = object : WebViewClient() {
                 override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
-                    AndroidLog.e("ALARM_POLLER", "Render process gone: didCrash=${detail?.didCrash()}")
+                    AndroidLog.e("ALARM_POLLER", "Render process gone: didCrash=${renderProcessCrashState(detail)}")
                     return true
                 }
 
@@ -11529,6 +11532,7 @@ class MainActivity : ComponentActivity() {
     // postSimpleNotificationWithIcon은 postSimpleNotification으로 통합됨
 
     // 간단한 알림 발송 (largeIcon 및 고정 ID 지원)
+    @SuppressLint("MissingPermission")
     private fun postSimpleNotification(
         key: String, 
         title: String, 
@@ -12017,6 +12021,7 @@ class MainActivity : ComponentActivity() {
     }
 
     // ✅ 댓글 알림 발송 (프로필 이미지 포함)
+    @SuppressLint("MissingPermission")
     private fun postCommentNotification(
         title: String,
         text: String,
@@ -12157,6 +12162,7 @@ class MainActivity : ComponentActivity() {
         loadProfileForComment(state, sanitized)
     }
 
+    @SuppressLint("MissingPermission")
     private fun refreshCommentNotification(tag: String) {
         val state = activeCommentNotifications[tag] ?: return
         val icon = commentLoadedBitmaps[tag] ?: state.lastProfileUrl?.let { avatarCache.get(it) }
@@ -12248,6 +12254,7 @@ class MainActivity : ComponentActivity() {
         return fallback?.groupValues?.getOrNull(1)
     }
 
+    @SuppressLint("MissingPermission")
     private fun loadProfileForComment(stateSnapshot: CommentNotificationState, profileUrl: String) {
         lifecycleScope.launch(Dispatchers.IO) {
             val cached = avatarCache.get(profileUrl)
@@ -12824,7 +12831,7 @@ class MainActivity : ComponentActivity() {
         
         hiddenWebView?.webViewClient = object : WebViewClient() {
             override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
-                AndroidLog.e("HIDDEN_WEBVIEW", "Render process gone in profile fetch: didCrash=${detail?.didCrash()}")
+                AndroidLog.e("HIDDEN_WEBVIEW", "Render process gone in profile fetch: didCrash=${renderProcessCrashState(detail)}")
                 pendingProfileCallback?.invoke(null)
                 pendingProfileCallback = null
                 return true
