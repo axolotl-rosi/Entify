@@ -1,4 +1,4 @@
-# 🔔 Entify
+# Entify
 
 > **엔트리(PlayEntry) 실시간 백그라운드 푸시 알림 및 통계 매니저**
 
@@ -8,7 +8,8 @@ Entify는 엔트리 공식 웹/앱에서 실시간으로 발생하는 알림(댓
 
 - [설치 페이지](https://entify-download.vercel.app/)
 - [보안 구조와 취약점 신고](SECURITY.md)
-- [보안 강화 및 배포 인수인계 계획](docs/SECURITY_HARDENING_HANDOFF.md)
+- [문서 안내](docs/README.md)
+- [버전별 변경 기록](CHANGELOG.md)
 - [위협 모델과 잔여 위험](docs/THREAT_MODEL.md)
 - [개인정보·세션 처리 설명](PRIVACY.md)
 - [APK 설치와 해시 검증](docs/INSTALLATION.md)
@@ -16,11 +17,11 @@ Entify는 엔트리 공식 웹/앱에서 실시간으로 발생하는 알림(댓
 
 ---
 
-## ✨ 핵심 기능 (Features)
+## 핵심 기능 (Features)
 
 1. **실시간 백그라운드 푸시 알림 (Foreground Data-Sync Service)**
    - 앱을 닫거나 스마트폰 화면이 꺼진 상태에서도 WakeLock과 포그라운드 서비스를 통해 주기적으로 알림을 감지합니다.
-   - 프로필 아바타, 작품 썸네일, 감정 뱃지(❤️, 🤖, ⚠️)가 적용된 풍부한 알림을 제공합니다.
+   - 프로필 아바타, 작품 썸네일과 알림 종류별 아이콘을 제공합니다.
 
 2. **알림 감시 마스터 토글 (Master Monitoring Toggle)**
    - 알림 감시 자체를 켜고 끌 수 있는 메인 스위치를 제공합니다. 감시가 꺼져 있을 때는 네트워크 폴링을 즉시 중단합니다.
@@ -45,7 +46,7 @@ Entify는 엔트리 공식 웹/앱에서 실시간으로 발생하는 알림(댓
 
 ---
 
-## 🏗️ 아키텍처 및 기술 스택
+## 아키텍처 및 기술 스택
 
 - **UI**: Jetpack Compose, Material 3, Material Icons Extended
 - **아키텍처**: MVVM Pattern, Kotlin Coroutines & Flow
@@ -56,7 +57,7 @@ Entify는 엔트리 공식 웹/앱에서 실시간으로 발생하는 알림(댓
 
 ---
 
-## 📁 프로젝트 구조
+## 프로젝트 구조
 
 ```
 Entify/
@@ -92,7 +93,7 @@ Entify/
 
 ---
 
-## 🚀 빌드 및 실행 가이드
+## 빌드 및 실행 가이드
 
 ### 개발 환경 요구 사항
 - Android Studio Hedgehog (2023.1.1) 이상
@@ -119,7 +120,7 @@ app/build/outputs/apk/release/app-release.apk
 
 ---
 
-## 🌐 Vercel 웹 설치 매니저 배포 방법
+## Vercel 웹 설치 매니저 배포 방법
 
 `web/` 디렉토리에 정적 설치 웹사이트가 마련되어 있습니다.
 
@@ -137,7 +138,7 @@ app/build/outputs/apk/release/app-release.apk
 
 ---
 
-## 🔐 세션·쿠키·토큰 보안
+## 세션·쿠키·토큰 보안
 
 - 비밀번호는 Entify가 저장하지 않으며, 사용자는 `https://playentry.org` 공식 로그인 화면에서 로그인합니다.
 - 세션 쿠키와 CSRF/x-token은 Android Keystore로 보호되는 암호화 저장소에만 보관합니다.
@@ -155,29 +156,7 @@ app/build/outputs/apk/release/app-release.apk
 
 ---
 
-## 📤 GitHub 레포지토리 등록 방법
-
-[https://github.com/dashboard](https://github.com/dashboard)에서 새 저장소를 생성하여 본 프로젝트의 소스 코드를 공개할 수 있습니다:
-
-```bash
-# 1. 깃 초기화 및 브랜치 설정
-git init
-git branch -M main
-
-# 2. 파일 추가 및 커밋
-git add .
-git commit -m "Initial commit: Entify notification client with filtering, DND, and Vercel web installer"
-
-# 3. 원격 저장소 연결 (예: your-username/Entify)
-git remote add origin https://github.com/<YOUR_GITHUB_USERNAME>/Entify.git
-
-# 4. 푸시
-git push -u origin main
-```
-
----
-
-## 📄 License & Third-Party Notices
+## License & Third-Party Notices
 
 - **프로젝트 라이선스**: 본 프로젝트는 **Entify Source-Available License v1.0**을 따릅니다. 공식 배포본의 개인적 이용 및 콘텐츠 제작은 무료이나 무단 상업적 재배포는 제한됩니다. 상세 내용은 [LICENSE](LICENSE)를 참조하세요.
 - **제3자 오픈소스 소프트웨어 규정**: 프로젝트에서 사용된 AndroidX, Jetpack Compose, Room, Coil, OkHttp, AndroidSVG 등의 오픈소스 고지 및 Apache 2.0 라이선스 전문은 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)에 상세히 기술되어 있습니다.
